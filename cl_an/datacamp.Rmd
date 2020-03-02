@@ -1,0 +1,58 @@
+---
+title: "Cluster Analysis - DataCamp"
+author: "dts"
+date: "04 02 2020"
+output: html_document
+---
+
+Steps:
+1. No missing values & all on one scale
+2. Choose basis for clustering
+3. Clustering!
+4. What those cluster mean?
+(repeat from step 2 if need to)
+
+
+# Distance vs. Similarity
+
+Distance = 1 - Similarity
+
+Dissimilarity can be counted with **Euclidean distance** (c^2 = a^2 + b^2):
+```{r Euclidean distance}
+# with 2 observations
+(two_players = matrix(c(0,9,0,12), nrow = 2, dimnames = list(c('BLUE', 'RED'), c('X', 'Y'))))
+dist(two_players, method = 'euclidean')
+# with more than 2 observations
+(three_players = matrix(c(0,9,-2,0,12,19), nrow = 3, dimnames = list(c('BLUE', 'RED', 'GREEN'), c('X', 'Y'))))
+dist(three_players, method = 'euclidean')
+```
+
+
+# Standartization (scaling)
+
+Xscaled = X - mean(X)/sd(X)
+
+After standartization of all features they all will have *mean = 0 and sd = 1*
+```{r scaling}
+(heigth_weight = data.frame(Height = c(6,6,8), Weight = c(200,202,200)))
+scale(heigth_weight)
+```
+
+# Distance for categorical data
+
+**Jaccard index** - J(A,B) = intersection of A & B / union of A & B
+
+Distance = 1 - Jaccard index
+
+```{r Jaccard index}
+(survey_a <- data.frame(wine = c(T,F,T), beer = c(T,T,F), whiskey = c(F,T,T), vodka = c(F,T,F)))
+dist(survey_a, method = "binary")
+```
+
+More than two categories -> use **dummification** (recode all into logical)
+```{r Dummification}
+(survey_b <- data.frame(color = c('red','green','blue','blue'), sport = c('soccer', 'hockey', 'hockey', 'soccer')))
+library(dummies)
+(dummy_survey_b <- dummy.data.frame(survey_b))
+dist(dummy_survey_b, method = "binary")
+```

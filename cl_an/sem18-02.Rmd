@@ -1,0 +1,513 @@
+---
+title: "Cluster Analysis - seminars"
+author: "dstsi"
+date: "18 02 2020"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+https://rpubs.com/shirokaner/clusters102
+
+```{r, include=FALSE}
+knitr::opts_chunk$set( # https://yihui.org/knitr/options/#chunk_options 
+  comment = "#>", echo = F, fig.dim = c(6, 4), warning = F, error = F, message = F
+)
+```
+
+# Data description
+
+```{r}
+library(datasets)
+head(iris, 3)
+
+library(psych)
+desc <- describeBy(iris, iris$Species, mat = TRUE)
+desc[1:12, 1:6]
+
+tapply(iris$Petal.Length, iris$Species, mean)
+tapply(iris$Petal.Width, iris$Species, mean)
+```
+
+```{r}
+library(ggplot2)
+ggplot(iris, aes(Petal.Length, Petal.Width, color = Species)) + 
+  geom_point() +
+  theme_classic()
+```
+
+\newpage
+# PARTITIONING: Searching for k
+
+```{r}
+set.seed(20) # to ensure reproducibility (could be omitted, the number will be random)
+irisCluster <- kmeans(iris[ , 3:4],  # Petal.Length and Petal.Width
+                      3, # how many groups to locate
+                      nstart = 20 # R will try 20 different random starting assignments 
+                      # and then select the one with the lowest within cluster variation.
+)
+
+table(irisCluster$cluster, iris$Species)
+```
+
+To do this, we run several models with k = [1:10] and compare the within-cluster sum of squares to the cluster centroid in each case.
+
+
+## Within-cluster sum of squares to the cluster centroid
+```{r}
+library(factoextra)
+library(cluster)
+fviz_nbclust(iris[ , 3:4], kmeans, method = "wss")
+```
+
+A **low withinss** shows high intra-cluster similarity and low inter-cluster similarity.
+
+The optimal number of clusters (k) is **where the elbow occurs**, i.e. a solution where the within-sum-of-squares decreases dramatically.
+
+
+## Silhouette width
+```{r}
+fviz_nbclust(iris[ , 3:4], kmeans, method = "silhouette")
+```
+
+A **high average silhouette** width indicates a good clustering.
+
+
+## Gap
+```{r}
+fviz_nbclust(iris[ , 3:4], kmeans, method = "gap")
+```
+
+The approach can be applied to *any clustering method* (i.e. K-means clustering, hierarchical clustering).
+
+The gap statistic compares the total intracluster variation for different values of k with their expected values under null reference distribution of the data (i.e. a distribution with no obvious clustering).
+
+\newpage
+# PARTITIONING: Visualizaing clusters
+```{r}
+fviz_cluster(irisCluster, data = iris[ ,3:4],
+  ellipse.type = "convex",
+  palette = "jco",
+  repel = TRUE)
+```
+
+```{r}
+fviz_cluster(irisCluster, data = iris[ ,3:4],
+   palette = "Set2", 
+   ggtheme = theme_minimal())
+```
+
+
+## Compare this solution to the one based on ALL the variables:
+```{r}
+fviz_cluster(irisCluster, data = iris[, -5],
+   palette = "Set2", ggtheme = theme_minimal())
+```
+
+Conclusion: *k-means works well when domain knowledge is rich*.
+
+If little is known, use the most different variables for clustering. Decision on the number of clusters can be based on metrics.
+
+In this example, irises can be clustered best by using 2 variables out of 4.
+
+\newpage
+# HIERARCHICAL: agnes - Agglomerative Hierarchical clustering algorithm
+
+**First - calculate the distance matrix**
+
+There are two functions to compute the distance matrix: 
+
+  - **dist()** - for ‘euclidean’, ‘manhattan’, ‘binary’, ‘canberra’, or ‘minkowski’ 
+  - **daisy()** - for ‘euclidean’, ‘manhattan’, or ‘gower’ methods 
+  
+The choice of the metric may have a large impact depending on what data you have.
+```{r}
+iris.use <- subset(iris, select = -Species) # select all variables but the "Species"
+d <- dist(iris.use, method = 'euclidean') # calculate a distance matrix on selected variables
+```
+
+What distance to choose? 
+
+  - **euclidean** -	usual distance between the two vectors (interval vars) 
+  - **manhattan** -	absolute distance between the two vectors 
+  - **canberra** -	for non-negative values (e.g., counts) 
+  - **minkowski** -	can be used for both ordinal and quantitative variables 
+  - **gower** -	the weighted mean of the contributions of each variable (for mixed types) 
+  - **binary** -	Jaccard distance for dichotomous variables 
+
+http://www.sthda.com/english/wiki/clarifying-distance-measures-unsupervised-machine-learning#distances-and-scaling 
+
+```{r}
+heatmap(as.matrix(d), symm = T,
+        distfun = function(x) as.dist(x))
+```
+
+\newpage
+```{r Get the cluster solution}
+library(cluster)
+hfit_ward <- agnes(d, method = "ward") # principle: minimal average distance between clusters
+hfit_average <- agnes(d, method = "average") # average distance between an observation and existing clusters
+hfit_complete <- agnes(d, method = "complete") # maximal distance between an observation and existing clusters
+```
+
+In this case, the species are known, so classification quality can be compared:
+table(cutree(hfit_ward, 3), iris$Species) # 16 incorrect:
+```{r}
+cat("Ward"); table(cutree(hfit_ward, 3), iris$Species) # 16 incorrect
+cat("\nhfit-Average"); table(cutree(hfit_average, 3), iris$Species) # 14 incorrect
+cat("\nhfit-Complete"); table(cutree(hfit_complete, 3), iris$Species) # 76 incorrect
+```
+
+In our case, the *average linkage method (2nd table) seems to work best* as it produces the smallest number of false positives and false negatives.
+
+```{r}
+h_avg_cut <- hcut(d, k = 3, hc_method = "average")
+fviz_cluster(h_avg_cut, iris.use, ellipse.type = "convex")
+```
+\newpage
+
+## Dendrogram
+
+```{r}
+cl <- cutree(hfit_average, k = 3) # cut the dendrogram to obtain exactly 3 clusters 
+
+library(dplyr)
+iris <- mutate(iris, cluster = cl) # add cluster membership as a column to the data frame
+head(iris)
+```
+
+```{r}
+library(magrittr)
+iris[ ,-5] %>%
+  group_by(cluster) %>% 
+  summarise_all(funs(mean(.))) # get the mean values of all variables by cluster
+```
+
+```{r}
+library(factoextra)
+fviz_dend(hfit_average, 
+          show_labels = FALSE, 
+          rect_border = TRUE)
+```
+
+```{r}
+library(dendextend)
+dend <- as.dendrogram(hfit_average)
+dend_col <- color_branches(dend, k = 3)
+plot(dend_col)
+```
+\newpage
+Yet another possibility is to cut at a height level. The height in a dendrogram is interpreted as a combination of method and distance.
+
+Here, the dendrogram results from a Euclidean distances’s matrix and average clustering. Cutting the dendrogram at the height of 1.8 means that the averagefor Euclidean distances between any two observations will not exceed 1.8:
+
+```{r}
+h_avg <- hclust(d, method = "average")
+cl2 <- cutree(h_avg, h = 1.8)
+dend <- as.dendrogram(h_avg)
+dend_col <- color_branches(dend, h = 1.8)
+plot(dend_col)
+```
+
+```{r}
+plot(h_avg)
+rect.hclust(h_avg, k = 3, border = "green")
+```
+\newpage
+http://stackoverflow.com/questions/14118033/horizontal-dendrogram-in-r-with-labels 
+
+```{r relict BannerPlot}
+plot(hfit_average)
+```
+\newpage
+
+# Clustering Mixed Data Types in R
+
+https://www.r-bloggers.com/clustering-mixed-data-types-in-r/
+
+Continuous variables:
+
+  - Acceptance rate
+  - Out of state students’ tuition
+  - Number of new students enrolled
+  
+Categorical variables:
+
+  - Whether a college is public/private
+  - Whether a college is elite, defined as having more than 50% of new students who graduated in the top 10% of their high school class
+
+
+## Clean the data
+```{r}
+set.seed(2020) # for reproducibility
+
+library(ISLR) # the college dataset
+library(Rtsne) # for t-SNE plot
+library(tidyverse)
+```
+
+```{r}
+head(College)
+```
+
+```{r}
+hist(College$Top10perc)
+```
+
+```{r}
+college_clean = College %>%
+  mutate(name = row.names(.), # make college names a variable
+         accept_rate = Accept/Apps,# ratio of applications to accepted student
+         isElite = cut(Top10perc, # how many top students are enrolled, % of all students
+                       breaks = c(0, 50, 100),
+                       labels = c("Not Elite", "Elite"),
+                       include.lowest = TRUE)) %>%
+  mutate(isElite = factor(isElite)) %>% # label colleges with many good students
+  select(name, accept_rate, Outstate, Enroll,  # "elites"
+         Grad.Rate, Private, isElite)
+glimpse(college_clean)
+```
+
+```{r}
+hist(college_clean$Enroll)
+```
+\newpage
+
+## Then we have to use a distance metric that can handle mixed data types
+```{r}
+library(cluster)
+gower_dist <- daisy(college_clean[ , -1],
+                    metric = "gower",
+                    type = list(logratio = 3)) # Enroll = log(Enroll)
+
+summary(gower_dist)
+```
+
+## Look at the most similar and dissimilar pairs in the data to see if they make sense
+```{r}
+gower_mat <- as.matrix(gower_dist)
+```
+
+Most similar pair:
+```{r}
+college_clean[
+  which(gower_mat == min(gower_mat[gower_mat != min(gower_mat)]), # lowest of those not equal to zero
+        arr.ind = TRUE)[1, ], ]
+```
+
+Most dissimilar pair:
+```{r}
+college_clean[
+  which(gower_mat == max(gower_mat[gower_mat != max(gower_mat)]),
+        arr.ind = TRUE)[1, ], ] # arr.ind. = array indices, a logical variable
+```
+\newpage
+
+## Choose the clustering algorithm
+
+We will use partitioning around medoids (PAM) for handling a custom distance matrix.
+
+Q: How does PAM work?
+
+A: PAM is an iterative algorithm. A ‘medoid’ is the observation that would yield the lowest average distance if it were to be re-assigned to the cluster it is assigned to. It works well with n < 10,000 observations per group.
+
+Q: How many clusters should be retained in the solution?
+
+A: Look at the silhouette width metric. This is an internal validation metric, an aggregated measure of how similar an observation is to its own cluster, compared to its closest neighboring cluster. The metric can range from -1 to 1, where higher values are better.
+
+## Calculate silhouette width for many several solutions using PAM:
+```{r}
+sil_width <- c(NA)
+
+for(i in 2:10){
+  pam_fit <- pam(gower_dist,
+                 diss = TRUE,
+                 k = i)
+  sil_width[i] <- pam_fit$silinfo$avg.width
+}
+# Plot the sihouette width (larger value is better):
+plot(1:10, sil_width,
+     xlab = "Number of clusters", xaxt='n',
+     ylab = "Silhouette Width",
+     ylim = c(0,1))
+axis(1, at = seq(2, 10, by = 1), las=2)
+lines(1:10, sil_width)
+```
+
+Conclusion: select the 3-cluster solutions as it has the highest silhouette width
+
+```{r}
+pam_fit <- pam(gower_dist, diss = TRUE, k = 3)
+pam_fit$data <- college_clean[ , -1]
+```
+\newpage
+
+## Interpret the solution:
+```{r}
+pam_results <- college_clean %>%
+  dplyr::select(-name) %>%
+  mutate(cluster = pam_fit$clustering) %>%
+  group_by(cluster) %>%
+  do(the_summary = summary(.))
+pam_results$the_summary
+```
+\newpage
+
+```{r}
+college_clean$cluster <- as.factor(pam_fit$clustering)
+describeBy(college_clean, college_clean$cluster)
+```
+
+Cluster 1 is mainly Private/Not Elite with medium levels of out of state tuition and smaller levels of enrollment.
+
+Cluster 2, on the other hand, is mainly Private/Elite with lower levels of acceptance rates, high levels of out of state tuition, and high graduation rates.
+
+Finally, cluster 3 is mainly Public/Not Elite with the lowest levels of tuition, largest levels of enrollment, and lowest graduation rate.
+
+
+Hint: medoids serve as exemplars of each cluster:
+
+```{r}
+college_clean[pam_fit$medoids, ]
+```
+
+## Visualization for the delivery of results
+```{r}
+set.seed(42)
+tsne_obj <- Rtsne(gower_dist, is_distance = TRUE)
+
+tsne_data <- tsne_obj$Y %>% # $Y is a matrix containing the new representations for the objects
+  data.frame() %>%
+  setNames(c("X", "Y")) %>%
+  mutate(cluster = factor(pam_fit$clustering),
+         name = college_clean$name)
+
+ggplot(aes(x = X, y = Y), data = tsne_data) +
+  geom_point(aes(color = cluster))
+```
+
+Have you noticed the small group?
+
+It consists of the larger, more competitive public schools not large enough to warrant an additional cluster according to silhouette width, but these 13 schools certainly have distinct characteristics
+
+```{r}
+tsne_data %>%
+  filter(X > 10 & X < 15,   # cluster coordinates may differ
+         Y > -20 & Y < -10) %>% 
+  left_join(college_clean, by = "name") %>%
+  collect %>%
+  .[["name"]]
+```
+
+```{r}
+heatmap(gower_mat, symm = T,
+        distfun = function(x) as.dist(x))
+```
+
+```{r}
+pam_fit2 <- pam(gower_dist, diss = TRUE, k = 4)
+
+pam_results2 <- college_clean %>%
+  dplyr::select(-name) %>%
+  mutate(cluster = pam_fit2$clustering) %>%
+  group_by(cluster) %>%
+  do(the_summary = summary(.))
+
+college_clean[pam_fit2$medoids, ]
+```
+
+```{r}
+tsne_obj2 <- Rtsne(gower_dist, is_distance = TRUE)
+
+tsne_data2 <- tsne_obj2$Y %>% # $Y is a matrix containing the new representations for the objects
+  data.frame() %>%
+  setNames(c("X", "Y")) %>%
+  mutate(cluster = factor(pam_fit2$clustering),
+         name = college_clean$name)
+
+ggplot(aes(x = X, y = Y), data = tsne_data2) +
+  geom_point(aes(color = cluster))
+```
+
+Gower distance + t-SNE is the best instrument for clustering mixed data at the moment. However, a 4-cluster solution is less satisfactory than a 3-cluster one.
+
+The smallest cluster as represented by t-SNE can be re-coded manually.
+
+```{r}
+levels(tsne_data$cluster) <- c("1", "2", "3", "4")
+tsne_data$cluster[tsne_data$X >  10 & tsne_data$X < 15 &    tsne_data$Y > -20 & tsne_data$Y < -10] <- 4
+ggplot(aes(x = X, y = Y), data = tsne_data) +
+  geom_point(aes(color = cluster))
+```
+
+```{r}
+describeBy(college_clean, tsne_data$cluster)
+```
+
+To conclude, there are four cluster among the 777 colleges.
+
+**Cluster 1** are mainly private, non-elite colleges with medium levels of out-of-state tuition and smaller levels of student enrollment.
+
+**Cluster 2** consists of private, elite colleges with lower acceptance rates and higher rates of out-of-state tuition and graduation.
+
+**Cluster 3** is mainly public and non-elite, with the lowest rates of tuition and graduation but the largest levels of enrollment.
+
+Lastly, **Cluster 4** consists of 13 public colleges with rather high enrolment, low acceptance rate, medium tuition rate, and a high graduation rate.
+
+Read more on t-SNE: https://jmonlong.github.io/Hippocamplus/2018/02/13/tsne-and-clustering/
+
+
+# Optional: Fuzzy C-means
+
+finding cluster solutions with cluster membership probability
+
+```{r}
+library(cluster)
+fuzzy_fit <- fanny(iris[ ,3:4], 3, metric = "euclidean", stand = FALSE)
+head(fuzzy_fit$membership, 3)
+```
+
+```{r}
+fviz_cluster(fuzzy_fit, 
+             ellipse.type = "norm", 
+             repel = TRUE,
+             palette = "jco", 
+             ggtheme = theme_minimal(),
+             legend = "right")
+```
+
+https://cran.r-project.org/web/packages/ppclust/vignettes/fcm.html
+
+```{r}
+library(ppclust)
+fcm_fit <- fcm(iris[ ,-5], centers = 3)
+head(fcm_fit$u, 3)
+```
+
+```{r}
+fcm_fit$u[102,]
+fcm_fit$u[115,]
+fcm_fit$u[143,]
+cat("")
+table(cutree(h_avg, 3), fcm_fit$cluster) # same results
+```
+
+```{r}
+fviz_cluster(ppclust2(fcm_fit, "kmeans"), data = iris[ ,3:4],
+             ellipse.type = "norm", 
+             repel = TRUE,
+             palette = "jco", 
+             ggtheme = theme_minimal(),
+             legend = "right")
+```
+
+# Optional: DBSCAN
+
+About: http://www.sthda.com/english/wiki/wiki.php?id_contents=7940
+
+Data source: https://www.r-bloggers.com/chaining-effect-in-clustering/
+
+```{r}
+
+```
+
