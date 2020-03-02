@@ -1,0 +1,265 @@
+---
+title: "Logistic Regression (DataCamp course)"
+author: "dts"
+date: "10 02 2020"
+output: html_document
+---
+
+# Parallel slopes
+
+**y ~ x + z**, where x is numeric and z is categoric.
+```{r plotting parallel slopes}
+mod <- lm(hwy ~ displ + factor(year), data = mpg)
+summary(mod)
+# get the coefficients
+library(broom)
+augment(mod)
+
+# plotting by fitted values, not by observed
+ggplot(augment(mod), aes(x = displ, y = hwy, color = factor.year.)) + 
+  geom_point() +
+  geom_line(aes(y = .fitted))
+```
+
+"After controlling for ..." - proper way to describe such model.
+
+
+# Evaluating and extending parallel slopes model
+
+Residual = real - fitted (values)
+
+## Model fit
+
+**Recall** (or *coefficient of determination*): R^2 = 1 - SSE/SST 
+- *SSE* = the Sum of the Squared Errors (or residuals) 
+- *SST* = the Total Sum of the Squares 
+
+*Additional explanatory variables always increase recall (R^2)!*
+
+**Recall adjusted**: R^2adj = 1 - SSE/SST * n-1/n-p-1
+- *p* = number of explanatory variables
+
+```{r fitted values}
+# return a vector of fitted values
+predict(mod)
+# return a data.frame
+augment(mod)
+```
+
+## Predicting
+```{r predicting for new data}
+new_obs <- data.frame(displ = 1.8, year = 2008)
+predict(mod, newdata = new_obs)
+augment(mod, newdata = new_obs)
+```
+
+## Interaction
+
+Interaction term = 
+
+```{r Interaction}
+# only graphical representation
+ggplot(data = mpg, aes(x = displ, y = hwy, color = factor(year))) +
+  geom_point() + 
+  geom_smooth(method = "lm", se = 0)
+
+# creating a model
+mod2 <- lm(hwy ~ displ + factor(year) + displ:factor(year), data = mpg)
+summary(mod2)
+# using fitted values from a model
+ggplot(augment(mod2), aes(x = displ, y = hwy, color = factor.year.)) + 
+  geom_point() +
+  geom_line(aes(y = .fitted))
+```
+
+### Simpson's Paradox
+
+Subgroups are important!
+
+
+# Multiple Regression
+
+```{r}
+library(UsingR); data(babies)
+babies <- subset(babies, age != 99 & gestation != 999)
+
+# Adding z-axe as color
+ggplot(babies, aes(x = gestation, y = age)) + 
+  geom_point(aes(color = wt))
+
+# Tiling the plane
+library(dplyr); library(modelr)
+grid <- babies %>%
+  data_grid(
+    gestation = seq_range(gestation, by = 1), 
+    age = seq_range(age, by = 1)
+  )
+mod <- lm(wt ~ gestation + age, data = babies)
+bwt_hats <- broom::augment(mod, newdata = grid)
+
+ggplot(babies, aes(x = gestation, y = age)) + 
+  geom_point(aes(color = wt)) + 
+  geom_tile(data = bwt_hats, aes(fill = .fitted, alpha = 0.5)) + 
+  scale_fill_continuous("wt", limits = range(babies$wt))
+
+# 3D visualization
+# library(plotly)
+# plot_ly(data = babies, z = ~wt, x = ~gestation, y = ~age, opacity = 0.6) %>%
+#   add_markers(text = ~case, marker = list(size = 2)) %>%
+#   add_surface(x = ~x, y = ~y, z = ~plane, showscale = FALSE,
+              # cmax = 1, surfacecolor = color1, colorscale = col1)
+```
+
+## Conditional interpretation of coefficients
+
+Each B coefficient in model should be interpreted "**Outcome raises/decreases by N when X is raises/decreases by 1 while Y is constant (with mean of Y)**"
+
+```{r adding third categorical predictor}
+lm(wt ~ gestation + age + smoke, babies)
+```
+
+```{r}
+# library(plotly)
+# plot_ly(data = babies, z = ~wt, x = ~gestation, y = ~age, opacity = 0.6) %>%
+#   add_markers(color = ~factor(smoke), text = ~"kek", marker = list(size = 2)) %>%
+#   add_surface(x = ~x, y = ~y, z = ~plane0, showscale = FALSE, 
+#               cmin = 0, cmax = 1, surfacecolor = "blue", colorscale = "blue") %>%
+#   add_surface(x = ~x, y = ~y, z = ~plane1, showscale = FALSE, 
+#               cmin = 0, cmax = 1, surfacecolor = "red", colorscale = "red")
+```
+
+
+# Logistic Regression
+
+**geom_jitter** helps to visualize dots on graph with some distance between them on Y axis when point plotted only by X axes
+
+```{r}
+# ggplot(data = heartTr, aes(x = age, y = survived)) + 
+#   geom_jitter(width = 0, height = 0.05, alpha = 0.5)
+```
+
+```{r}
+# binned points and line
+data_space <- ggplot(data = MedGPA_binned, aes(x = mean_GPA, y = acceptance_rate)) + geom_point() + geom_line()
+
+# augmented model
+MedGPA_plus <- mod %>%
+  augment(type.predict = "response")
+
+# logistic model on probability scale
+data_space +
+  geom_line(data = MedGPA_plus, aes(x = GPA, y = .fitted), color = "red")
+```
+
+## Converting
+```{r}
+# probability
+heartTr_plus <- mod %>%
+  augment(type.predict = "response") %>%
+  mutate(y_hat = .fitted)
+
+ggplot(heartTr_plus, aes(x = age, y = y_hat)) + 
+  geom_point() + geom_line() + 
+  scale_y_continuous("Probability of being alive", limits = c(0, 1))
+
+# odds
+heartTr_plus <- heartTr_plus %>%
+  mutate(odds_hat = y_hat / (1 - y_hat))
+
+ggplot(heartTr_plus, aes(x = age, y = odds_hat)) + 
+  geom_point() + geom_line() + 
+  scale_y_continuous("Odds of being alive")
+
+# logit
+heartTr_plus <- heartTr_plus %>%
+  mutate(log_odds_hat = log(odds_hat))
+
+ggplot(heartTr_plus, aes(x = age, y = log_odds_hat)) + 
+  geom_point() + geom_line() + 
+  scale_y_continuous("Log(odds) of being alive")
+
+# odds ratios
+exp(coef(mod))
+```
+
+```{r task on converting}
+# compute odds for bins
+MedGPA_binned <- MedGPA_binned %>%
+  mutate(odds = acceptance_rate / (1 - acceptance_rate))
+
+# plot binned odds
+data_space <- ggplot(MedGPA_binned, aes(x = mean_GPA, y = odds)) + 
+  geom_point() + geom_line()
+
+# compute odds for observations
+MedGPA_plus <- MedGPA_plus %>%
+  mutate(odds_hat = .fitted / (1 - .fitted))
+
+# logistic model on odds scale
+data_space +
+  geom_line(data = MedGPA_plus, aes(x = GPA, y = odds_hat), color = "red")
+
+
+# compute log odds for bins
+MedGPA_binned <- MedGPA_binned %>% mutate(log_odds = log(acceptance_rate / (1 - acceptance_rate)))
+
+# plot binned log odds
+data_space <- ggplot(data = MedGPA_binned, aes(x = mean_GPA, y = log_odds)) + geom_point() + geom_line()
+
+# compute log odds for observations
+MedGPA_plus <- MedGPA_plus %>% mutate(log_odds_hat = log(.fitted / (1 - .fitted)))
+
+# logistic model on log odds scale
+data_space +
+  geom_line(data = MedGPA_plus, aes(x = GPA, y = log_odds_hat), color = "red")
+```
+
+## Converting coefficients
+```{r}
+# log-odds scale of fitted values
+broom::augment(mod)
+# probability scale of fitted values
+broom::augment(mod, type.predict = "response")
+
+
+# Out-of-sample predictions
+cheney <- data.frame(age = 71, transplant = "treatment")
+augment(mod, newdata = cheney, type.predict = "response")
+```
+
+
+```{r}
+# Making binary predictions
+mod_plus <- augment(mod, type.predict = "response") %>%
+  mutate(alive_hat = round(.fitted))
+
+mod_plus %>%
+  select(is_alive, age, transplant, .fitted, alive_hat)
+```
+
+
+# case: Italian restaurants in NYC
+
+```{r}
+nyc <- read.csv(url("https://assets.datacamp.com/production/repositories/845/datasets/639a7a3f9020edb51bcbc4bfdb7b71cbd8b9a70e/nyc.csv"))
+dplyr::glimpse(nyc)
+pairs(nyc)
+```
+
+## Assumptions
+
+- check for multicollinearity 
+
+```{r}
+library(plotly)
+# draw 3D scatterplot
+p <- plot_ly(data = nyc, z = ~Price, x = ~Food, y = ~Service, opacity = 0.6) %>%
+  add_markers(color = ~factor(East)) 
+
+# draw two planes
+p %>%
+  add_surface(x = ~x, y = ~y, z = ~plane0, showscale = FALSE) %>%
+  add_surface(x = ~x, y = ~y, z = ~plane1, showscale = FALSE)
+```
+
+

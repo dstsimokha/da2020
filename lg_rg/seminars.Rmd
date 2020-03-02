@@ -1,0 +1,262 @@
+---
+title: "Logistic Regression"
+author: "mglotov"
+date: "28 01 2020"
+output: html_document
+---
+
+https://rpubs.com/shirokaner/logisticregrex
+
+# Intro
+```{r}
+# glm(y ~ x1 + x2, data, family = binomial())
+mydata <- read.csv("https://stats.idre.ucla.edu/stat/data/binary.csv")
+head(mydata)
+
+library(psych)
+mydata$rank <- factor(mydata$rank)
+describe(mydata)
+describeBy(mydata, mydata$admit)
+```
+
+## Missing values:
+```{r}
+library(Amelia)
+library(mlbench)
+missmap(mydata, col=c("blue", "red"), legend = T, main = "Missing values vs observed")
+```
+
+## Check the cross-tabs of interest:
+```{r}
+xtabs(~ admit + rank, data = mydata)
+```
+
+# Estimating model
+```{r}
+mylogit <- glm(admit ~ gre + gpa + rank, data = mydata, family = "binomial")
+summary(mylogit)
+```
+The lower Deviance ('Resid. Dev') the better.
+
+## Goodness of Fit:
+```{r}
+anova(mylogit, test="Chisq")
+```
+
+
+### Change the reference level of a categorical predictor:
+```{r}
+mydatarank2 <- within(mydata, rank <- relevel(rank, ref = 2))
+mylogitrank2 <- update(mylogit, data = mydatarank2)
+summary(mylogitrank2)
+```
+
+### Check the fit of the ‘rank’ variable:
+```{r}
+library(aod)
+wald.test(b = coef(mylogit), Sigma = vcov(mylogit), Terms = 4:6)
+
+anova(mylogit, test="Chisq")
+```
+
+### Check the significance of the difference between ranks 2 and 3:
+```{r}
+l <-cbind(0, 0, 0, 1, -1, 0) #contrast between rank2 and rank3
+wald.test(b = coef(mylogit), Sigma = vcov(mylogit), L = l)
+```
+
+## Getting coefficients:
+```{r}
+exp(cbind(OR = coef(mylogit), confint(mylogit)))
+```
+
+## Continue with calculating the predicted probability of admission at each value of rank, holding gre and gpa at their means:
+```{r}
+newdata1 <- with(mydata, data.frame(gre = mean(gre), 
+                        gpa = mean(gpa), 
+                        rank = factor(1:4)))
+newdata1 
+```
+
+### for rank:
+```{r}
+newdata1$rankP <- predict(mylogit, newdata = newdata1, type = "response")
+newdata1 ## predicted probabilities for different ranks at the mean levels of gre and gpa.
+```
+
+### for gre levels (we pick gre for it has a larger variance):
+```{r}
+newdata2 <- with(mydata, data.frame(gre = rep(seq(from = 200, to = 800, length.out = 100), 4), 
+                                    gpa = mean(gpa), rank = factor(rep(1:4, each = 100))))
+newdata3 <- cbind(newdata2, predict(mylogit, newdata = newdata2, type = "link", se = T))
+```
+
+
+## Plot the predicted values with confidence intervals (rank * gre):
+```{r}
+newdata3 <- within(newdata3, {
+  PredictedProb <- plogis(fit)
+  LL <- plogis(fit - (1.96 * se.fit))
+  UL <- plogis(fit + (1.96 * se.fit))
+})
+newdata3[newdata3$gre == 800, ]
+
+library(ggplot2)
+ggplot(newdata3, aes(x = gre, y = PredictedProb)) +
+  geom_ribbon(aes(ymin = LL, ymax = UL, fill = rank), alpha = 0.2) +
+  geom_line(aes(colour = rank), size = 0.75) +
+  ylim(0, 1)
+```
+
+## for gpa levels:
+```{r}
+newdata4 <- with(mydata, data.frame(gre = mean(gre), 
+                                    gpa = rep(seq(from = 2.2, to = 4.0, length.out = 18), 4),
+                                    rank = factor(rep(1:4, each = 18))))
+newdata5 <- cbind(newdata4, predict(mylogit, newdata = newdata4, type = "link", se = T))
+newdata5 <- within(newdata5, {
+  PredictedProb <- plogis(fit)
+  LL <- plogis(fit - (1.96 * se.fit))
+  UL <- plogis(fit + (1.96 * se.fit))
+})
+ggplot(newdata5, aes(x = gpa, y = PredictedProb)) +
+  geom_ribbon(aes(ymin = LL, ymax = UL, fill = rank), alpha = 0.2) +
+  geom_line(aes(colour = rank), size = 0.75) +
+  ylim(0, 1)
+```
+
+# Overall goodness-of-fit measures
+
+- loglikelihood (-2LL, pseudo-R-squared)
+- confusion matrix (accuracy rate, ROC curve)
+
+## Loglikelihood
+
+Based on the LL are: 
+- deviance (aka -2LL) 
+- pseudo-R-squared measures 
+
+```{r}
+library(lmtest)
+mymodel2 <- glm(admit ~ gre + rank, data = mydata, family = "binomial")
+mymodel3 <- glm(admit ~ rank, data = mydata, family = "binomial")
+lrtest(mymodel3, mymodel2, mylogit) #you want LogLik closer to 0.
+```
+
+```{r}
+anova(mymodel3, mymodel2, mylogit, test ="Chisq") # This is JUST THE SAME (look at p-values), but it is -2LL.
+```
+
+## Pseudo-R-squared measures:
+
+- **-2LL (likelihood ratio)**: the closer -2LL to zero, the better 
+- **McFadden’s**: values *0.2-0.4* are interpreted as “satisfactory” as it is a conservative measure 
+
+```{r}
+library(pscl)
+pR2(mylogit)
+```
+
+- *llh* is The log-likelihood from the fitted (full) model 
+- *llhNull* is The log-likelihood from the intercept-only restricted model
+- *G2* equals minus two times the difference in the log-likelihoods (An LR test of the hypothesis that all coefficients exceptthe intercept(s) are zero).
+- *McFadden* is McFadden’s pseudo r-squared, also known as the “likelihood-ratio index”, compares a model with just the intercept to a model with all parameters.
+- *r2ML* means maximum likelihood pseudo r-squared (1−exp(−G2/N))
+- *r2CU* is Cragg and Uhler’s pseudo r-squared (a normed measure)
+
+
+```{r}
+library(rcompanion)
+compareGLM(mymodel3, mymodel2, mylogit)
+```
+
+A technical note: if you use grouped data, pseudo-R-squared measures are likely to be overestimated by several times. This is a know phenomenon. How to deal with it? Recalculate the model fit by expanding your data back to individual observations.
+
+
+# Hosmer-Lemeshow Test: search for evidence of poor fit
+
+A well-fitting model shows no significant difference between the model and the observed data
+
+In this test, a well-fitting model should report a p-value greater than 0.05:
+“*If the p-value is small, this is indicative of poor fit*. A large p-value does not mean the model fits well, since lack of evidence against a null hypothesis is not equivalent to evidence in favour of the alternative hypothesis. In particular, if our sample size is small, a high p-value from the test may simply be a consequence of the test having lower power to detect mis-specification, rather than being indicative of good fit.”
+
+```{r}
+#install.packages("generalhoslem")
+library(generalhoslem)
+logitgof(mydata$admit, fitted(mylogit), g = 10) #g should be larger than the number of predictors; df = g - 2
+```
+
+**!if Hosmer and Lemeshow test's p-value > 0.05 = nice model!**
+
+```{r}
+library(devtools)
+
+library(sjstats) 
+hoslem_gof(mylogit)
+```
+
+Due to low power, alternative have been suggested to replace the Hosmer-Lemeshow test, they are the Osius-Rojek and the Stukel test (see functions to calculate them here: http://www.chrisbilder.com/categorical/Chapter5/AllGOFTests.R):
+```{r}
+o.r.test(mylogit)
+stukel.test(mylogit)
+```
+
+
+# Classification tables / Hit ratio
+
+- A classification table, or matrix (fitted values are cross-tabed with test data) 
+- Accuracy, sensitivity, and specificity 
+
+First, we need to create a training and a test subsamples and fit a model on the training data:
+```{r}
+bound <- floor((nrow(mydata)/4) * 3)  #define 75% of training and test set (could be 50%, 60%)
+set.seed(123)
+df <- mydata[sample(nrow(mydata)), ]  #sample 400 random rows out of the data
+df.train <- df[1:bound, ]  #get training set
+df.test <- df[(bound + 1):nrow(df), ]  #get test set
+
+mylogit1 <- glm(admit ~ gre + gpa + rank, data = df.train, family = "binomial", 
+    na.action = na.omit)
+```
+
+Then we count the proportion of outcomes accurately predicted on the test data:
+```{r}
+pred <- format(round(predict(mylogit1, newdata = df.test, type = "response")))
+accuracy <- table(pred, df.test[,"admit"])
+sum(diag(accuracy))/sum(accuracy)
+
+xtabs(~ pred + df.test$admit)
+```
+
+
+```{r}
+library(caret); library(e1071)
+confusionMatrix(table(pred, df.test$admit))
+```
+
+Conclusion: Our model fit is not statistically significantly better than no model at all (Null Information Rate).
+
+
+# Let’s ROC! (‘receiver operating characteristic’)
+
+- We are concerned about the area under the ROC curve, or AUROC, or concordance. 
+- That metric ranges from 0.50 (no discrimination ability) to 1.00 (perfect discrimination) 
+- Values above 0.80 indicate that the model does a good job 
+- This is a curve of the cost function 
+*First, let’s learn by looking at a very well-fitting and a poorly fitting model.*
+
+Here is an ROC curve with a strong predictor.
+```{r}
+library(pROC)
+# Compute AUC for predicting admit with continuous variables:
+f1 <- roc(admit ~ gre + gpa, data = df.train) 
+plot(f1$gre, col = "red")
+```
+
+```{r}
+f1$gre
+```
+
+
+
+
