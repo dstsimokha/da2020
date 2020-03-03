@@ -1,0 +1,95 @@
+---
+title: "task1"
+author: "Dmitriy Tsimokha"
+date: "03 03 2020"
+output: html_document
+---
+
+https://www.core-econ.org/doing-economics/book/text/08-03.html
+
+#8.1
+```{r}
+library(tidyverse); library(readxl); library(knitr)
+# loading and merging excel spreadsheets
+lifesat_data <- read_excel("Project-8-datafile.xlsx",
+  sheet = "Wave 1")
+lifesat_data <- rbind(lifesat_data,
+  read_excel("Project-8-datafile.xlsx", sheet = "Wave 2"))
+lifesat_data <- rbind(lifesat_data,
+  read_excel("Project-8-datafile.xlsx", sheet = "Wave 3"))
+lifesat_data <- rbind(lifesat_data,
+  read_excel("Project-8-datafile.xlsx", sheet = "Wave 4"))
+# adding labels and descriptions
+attr(lifesat_data, "labels") <- 
+c("EVS-wave", "Country/region",
+  "Respondent number",
+  "Health", "Life satisfaction",
+  "Work Q1", "Work Q2", "Work Q3",
+  "Work Q4", "Work Q5",
+  "Sex", "Age", "Marital status",
+  "Number of children",
+  "Education", "Employment",
+  "Monthly household income")
+
+attr(lifesat_data, "shortDescription") <- 
+c("EVS-wave",
+  "Country/region",
+  "Original respondent number",
+  "State of health (subjective)",
+  "Satisfaction with your life",
+  "To develop talents you need to have a job",
+  "Humiliating to receive money w/o working for it",
+  "People who don't work become lazy",
+  "Work is a duty towards society",
+  "Work comes first even if it means less spare time",
+  "Sex",
+  "Age",
+  "Marital status",
+  "How many living children do you have",
+  "Educational level (ISCED-code one digit)",
+  "Employment status",
+  "Monthly household income (× 1,000s PPP euros)")
+# checking 
+attr(lifesat_data, "labels")[attr(lifesat_data, "names") == "X028"]
+attr(lifesat_data, "shortDescription")[attr(lifesat_data, "names") == "X028"]
+```
+
+#8.2
+```{r}
+# Inspect the data and recode missing values
+lifesat_data[lifesat_data == ".a"] <- NA
+# Recode the life satisfaction variable
+lifesat_data$A170[lifesat_data$A170 == 
+  "Dissatisfied"] <- 1
+lifesat_data$A170[lifesat_data$A170 == 
+  "Satisfied"] <- 10
+lifesat_data$A170 <- as.numeric(lifesat_data$A170)
+# Recode the variable for number of children
+lifesat_data$X011_01[lifesat_data$X011_01 == 
+  "No children"] <- 0
+lifesat_data$X011_01 <- 
+  as.numeric(lifesat_data$X011_01)
+# Replace text with numbers for multiple variables
+lifesat_data <- lifesat_data %>%
+  mutate_at(c("C036", "C037", "C038", "C039", "C041"),
+    funs(recode(., 
+      "Strongly disagree" = "1", 
+      "Disagree" = "2", 
+      "Neither agree nor disagree" = "3",
+      "Agree" = "4",
+      "Strongly agree" = "5"))) %>%
+  mutate_at(c("A009"), funs(recode(., 
+    "Very poor" = "1",
+    "Poor" = "2",
+    "Fair" = "3",
+    "Good" = "4",
+    "Very good" = "5"))) %>%
+  mutate_at(c("A009", "C036", "C037",
+    "C038", "C039", "C041", "X047D"), funs(as.numeric))
+# Split a variable containing numbers and text
+lifesat_data <- lifesat_data %>% 
+  separate(X025A, c("Education_1", "Education_2"),
+    " : ", remove = FALSE) %>%
+  mutate_at("Education_1", funs(as.numeric))
+```
+
