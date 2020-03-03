@@ -1,0 +1,35 @@
+xkcd survey data replication:
+https://docs.google.com/spreadsheets/d/181o-GrWSBgMfgJmDSe6f29SHqyUKsn9XsyicGHtbERU/edit#gid=1950442338
+
+xkcd survey replication:
+https://docs.google.com/forms/d/e/1FAIpQLScQgX4mIgY-J9hXTDPrKtbJp6m53_8w-jCNHaXntv7t5PLQFA/viewform
+
+modeling with tidyverse and parsnip:
+https://towardsdatascience.com/modelling-with-tidymodels-and-parsnip-bae2c01c131c
+
+10 things R can do:
+https://simplystatistics.org/2019/03/13/10-things-r-can-do-that-might-surprise-you/
+
+Parametrizing R Markdown:
+https://towardsdatascience.com/ten-random-useful-things-in-r-that-you-might-not-know-about-54b2044a3868
+
+datapasta:
+https://cran.r-project.org/web/packages/datapasta/vignettes/how-to-datapasta.html
+
+gganimate r:
+https://www.datanovia.com/en/blog/gganimate-how-to-create-plots-with-beautiful-animation-in-r/
+
+real stats data modeling:
+http://www.statistikdatabasen.scb.se/pxweb/en/ssd/START__AM__AM0103__AM0103G/SLP2t12/table/tableViewLayout1/
+for practice, use SSYK 217
+
+Recipe-based business analytics in R: test, train, accuracy, models:
+https://diegousai.io/2019/06/modelling-with-tidymodels-and-parsnip/
+
+Economics/ business in R and Excel:
+https://www.core-econ.org/doing-economics/book/text/0-3-contents.html
+
+CHAPTER 6, 11, PROJECT 8
+https://www.core-econ.org/doing-economics/book/text/08-03.html
+
+Where to start the analysis? https://www.geckoboard.com/learn/data-literacy/basic-data-analysis-guide/

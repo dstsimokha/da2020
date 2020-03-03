@@ -1,0 +1,33 @@
+КНИГИ НА РУССКОМ
+Желязны, Джин. Говори на языке диаграмм: пособие по визуальным коммуникациям [Say it With Chart]
+
+Даррел Хафф. Как лгать с помощью статистики
+
+Александр Богачев. Графики, которые убеждают всех (выходит в феврале 2020 года в издательстве АСТ, как выйдет, здесь оставлю ссылку, также за анонсами можно следить в канале «Чартомойка»)
+
+КНИГИ НА АНГЛИЙСКОМ
+Dona Wong “Guide to Information graphics”
+Cole Nafflic “Storytelling with data”
+Stephen Few “Now you see it”
+Jorge Camoes “Data at work”
+Alberto Cairo “Functional art”, “Truthful art”
+Tufte Edward “Visual display of quantitative information”, “Beatiful Evidence” и др.
+КУРСЫ 
+Все курсы с сайта Lynda.com про Эксель
+Курсы по работе с данными с сайта datajournalism.com
+БЛОГИ ПО ВИЗУАЛИЗАЦИИ ДАННЫХ (НА АНГЛИЙСКОМ)
+flowingdata.com
+excelcharts.com
+storytellingwithdata.com
+visualisingdata.com/blog
+СМОТРЕТЬ КАЧЕСТВЕННЫЕ РАБОТЫ
+
+Twitter.com:
+
+
+GuardianVisuals
+WSJGraphics
+BBCNewsGraphics
+Postgraphics
+Nytgraphics
+Ftdata
