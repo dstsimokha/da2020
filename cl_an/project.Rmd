@@ -1,0 +1,41 @@
+---
+title: "DA2020 - cluster analysis project (Tsimokha Dmitriy, 161)"
+author: "Dmitriy Tsimokha"
+date: "3/4/2020"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+Your task is to clusterise R users among the participants of the Stackoverflow 2019 survey for a software company targeting R users. "R users" are defined here those who indicated they worked with the R language. Using the variables of your choice, explore the possible clustering solutions in this group, and describe the differrences between the obtained clusters of R users.
+
+Questionnaire: Stackoverflow 2019
+
+Data:  [dataforproject2.csv](https://lms.hse.ru/view_file.php?action=download&file=2166667), attached here (filtered data from Stackoverflow 2019)
+Deadline: March 10th, 11:50 PM. Later submissions have 50% off the grade.
+
+The project should be submitted as an archive with 2 files: the Rmd script and the html output. As an alternative, you can include in your script a link to the rpubs publication or another external repo. The report should not be too lengthy or overstuffed (up to 10 A4 pages long).
+
+All projects will be graded according to the following criteria:
+
+  1) data are described (name 1-3 important characteristics of your data) - 0.6 points
+  2) variable choice is justified (you may want to use not all the variables) - 1 point
+  3) the distance metric matches variable types - 1 point (if this is incorrect, interpretation will fail)
+  4-5) you have tried a combination of k-means/PAM and agglomerative clustering - 2 points
+  6) clusters have been visualized - 1 point
+  7) decision on how many clusters to retain is based on tests/ dendrograms - 1 point
+  8) comments on which clustering method delivers better results - 1 point
+  9) the resulting clusters are described and labelled - 1.4 points
+  10) the cluster solution is validated with any other methods (including but not limited to: PCA, regression, etc.) - 1 point
+
+Original solutions are especially welcomed.
+
+Grade descriptions:
+
+  * 9-10 clusters are defined, described, and named the report is coherent and complete 
+  * 8 clusters are defined, described, and named but 1-2 minor mistakes are allowed
+  * 7 clusters are defined and described but a minor part is missing or the report contains several minor mistakes 
+  * 6 clusters are defined and described but a minor part is missing or at least one serious mistake is made 
+  * 5 clusters are defined but not described, the report is not coherent
+  * 4 clusters are defined, analysis has flaws in logic, but it is structured (distances are calculated, clusters are identified, and results are summarised) 
+  * 3 clusters are not identified, no summary provided
