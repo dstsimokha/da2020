@@ -1,7 +1,7 @@
 ---
 title: "DA2020 - cluster analysis project (Tsimokha Dmitriy, 161)"
 author: "Dmitriy Tsimokha"
-date: "3/4/2020"
+date: "3/14/2020"
 output:
   pdf_document: default
   html_document: default
@@ -14,7 +14,7 @@ Questionnaire: Stackoverflow 2019
 Data:  [dataforproject2.csv](https://lms.hse.ru/view_file.php?action=download&file=2166667), attached here (filtered data from Stackoverflow 2019)
 Deadline: March 10th, 11:50 PM. Later submissions have 50% off the grade.
 
-The project should be submitted as an archive with 2 files: the Rmd script and the html output. As an alternative, you can include in your script a link to the rpubs publication or another external repo. The report should not be too lengthy or overstuffed (up to 10 A4 pages long).
+The project should be submitted as an archive with **2 files: the Rmd script and the html output**. As an alternative, you can include in your script a link to the rpubs publication or another external repo. The report should not be too lengthy or overstuffed (up to 10 A4 pages long).
 
 All projects will be graded according to the following criteria:
 
@@ -39,3 +39,22 @@ Grade descriptions:
   * 5 clusters are defined but not described, the report is not coherent
   * 4 clusters are defined, analysis has flaws in logic, but it is structured (distances are calculated, clusters are identified, and results are summarised) 
   * 3 clusters are not identified, no summary provided
+  
+```{r}
+library(data.table)
+df <- fread("dataforproject2.csv", stringsAsFactors = T)
+str(df)
+```
+  
+To clusterize R user meaningfully I take following variables:
+
+  * Age
+  * Extraversion
+  * OpSys
+  * 
+  
+```{r}
+sapply(df[,c("Age", "Extraversion", "OpSys")], summary)
+```
+  
+  

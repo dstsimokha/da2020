@@ -1,0 +1,429 @@
+---
+title: "DA2020 - logistic regression project (Tsimokha Dmitriy, 161)"
+author: "Dmitriy Tsimokha"
+date: "30 02 2020"
+output:
+  prettydoc::html_pretty:
+    theme: cayman
+    highlight: github
+---
+
+
+# Research question
+
+The survey question "Will People Born Today Have a Better Life Than Their Parents?" assume only binary answers "Yes" or "No" and coded in dataset in the same way.
+
+I will prefer not to build a model with random good-looking predictors, but elaborate a very small research based on specific topic - how *respondent's level of expertise* (by professional coding expirience and level of influence at work) and *structure at work* can influence answers on outcome question.
+
+I think, that such parameters as expertise and structuredness can reflect level of respondent's confidence, and therefore I assume it will also influence on evaluation of 'how hard is life to me and people around in comparison with our parents' - logic is simple, *if you 'fit' well in life, feeling confident and your work is structured, you can think that your life is better, than your parents' life*.
+
+Let's test that hypothesis!
+
+
+## Predictors
+
+I will use three predictors in my main model: YearsCodePro, WorkPlan, PurchaseWhat. 
+
+Continuous: 
+  * **YearsCodePro**: *How many years have you coded professionally (as a part of your work)?* 
+
+Categorical: 
+  * **WorkPlan**: *How structured or planned is your work?* 
+  * **PurchaseWhat**: *What level of influence do you, personally, have over new technology purchases at your organization?* 
+
+Now I will load the data and relevel factors, then recode them with more short names, it will be more useful to read and interpret.
+
+```{r loading data, message=FALSE, warning=FALSE, include=FALSE}
+library(data.table); library(dplyr); library(tidyverse)
+download.file("https://www.dropbox.com/s/1apkvsjvimbbg6k/survey_results_public.csv?dl=1", "survey_results_public.csv")
+df <- fread("survey_results_public.csv", encoding = "UTF-8", select = c("BetterLife", "YearsCodePro", "WorkPlan", "PurchaseWhat", "Age"), stringsAsFactors=FALSE); file.remove("survey_results_public.csv")
+# cutting strange values
+df <- df %>% filter(Age >= 18 & Age <= 60)
+df <- df %>% select(-Age)
+df <- df %>% filter(YearsCodePro != "More than 50 years" & YearsCodePro != "Less than 1 year")
+# recoding NA's to others
+df$PurchaseWhat <- replace_na(df$PurchaseWhat, "Non-responce")
+df$WorkPlan <- replace_na(df$WorkPlan, "Non-responce")
+
+# Transforming outcome to a factor
+# df$BetterLife[df$BetterLife=="Yes"] = 1; df$BetterLife[df$BetterLife=="No"] = 0
+df$BetterLife <- factor(df$BetterLife)
+
+# Transforming and releveling predictors
+df$YearsCodePro <- as.numeric(df$YearsCodePro)
+df$YearsCodePro <- scale(df$YearsCodePro, center = T, scale = F)
+df$YearsCodePro <- as.numeric(df$YearsCodePro)
+df$WorkPlan <- factor(df$WorkPlan, levels = c("There's no schedule or spec; I work on what seems most important or urgent", "There is a schedule and/or spec (made by me or by a colleague), and my work somewhat aligns", "There is a schedule and/or spec (made by me or by a colleague), and I follow it very closely", "Non-responce"), labels = c("-lowStrct", "-medStrct", "-highStrct", "Non-responce"))
+df$PurchaseWhat <- factor(df$PurchaseWhat, levels = c("I have little or no influence", "I have some influence", "I have a great deal of influence", "Non-responce"), labels = c("-lowInfl", "-medInfl", "-highInfl", "Non-responce"))
+```
+
+In preprocessing: 
+
+  - dataset was filtered by age to include values in range from 18 to 60 to avoid outliers 
+  - also dataset was filtered by predictor **YearsCodePro** to not include values "*Less than 1 year*" & "*More than 50 years*" and then recoded to numeric 
+  - then numeric predictor **YearsCodePro** was *scaled and centered* 
+  - all NA's in predictors **PurchaseWhat** & **WorkPlan** were recoded as "*Non-responce*" values 
+  - lastly, all but YearsCodePro variables (including outcome) were recoded to factors: 
+    - reference level in **WorkPlan** is "*There's no schedule or spec; I work on what seems most important or urgent*"
+    - reference level in **PurchaseWhat** is "*I have little or no influence*" 
+
+
+# Model equation
+
+That's how my model's equasion looks like - I'm not interested in any interactions, using only direct effect on outcome and evaluating it:
+
+$$\log[P(BetterLife)/P(1-BetterLife)] = \beta_{0} + \beta_{1} \cdot YearsCodePro + \beta_{2} \cdot WorkPlan + \beta_{3} \cdot PurchaseWhat$$
+
+
+# Data description
+
+So here is quick description of chosen variables:
+
+```{r data description, message=FALSE, warning=FALSE}
+library(psych)
+describeBy(df, df$BetterLife)
+```
+
+From the survey's report we already know that **63.7%** choose "Yes" and **36.3%** choose "No" answering on our outcome variable question - so most simple model will tell that we have probability of 0.63 to obtain "Yes" as an answers.
+
+From interesting points on that data description: 
+
+  - looking at centrality measures of **YearsCodePro** predictor (*centered!*) can be seen that in group with answer "No" it's mean = 0.67 and in group with answer "Yes" mean = -0.41. From that I can assume, that respondents in group "No" in general have more experience in coding professionally than respondents in group "Yes" - such data goes against my hypothesis about years of coding and I need to check it in logistic regression model later. 
+
+For other factor variables it is meaningless to look at such table so I will use plots and cross-tables to check them.
+
+
+## Checking for missing values
+
+```{r missing values, echo=FALSE, message=FALSE, warning=FALSE}
+library(Amelia)
+library(mlbench)
+missmap(df, col=c("grey", "green"), legend = T, main = "Missing values vs observed")
+df <- na.omit(df)
+```
+
+I have only 1 percent of NA's in my data provided only in outcome variable, all predictors' NA's were recoded into "Non-response" values.
+
+Anyway, I will omit that 1 percent of NA's to take to a model really clean data.
+
+
+## Variables scales and distributions
+
+### YearsCodePro: How many years have you coded professionally (as a part of your work)?
+
+```{r YearCodePro, echo=FALSE, message=FALSE, warning=FALSE}
+library(plotly)
+plot_ly(alpha = 0.6) %>%
+  add_histogram(x = ~df$YearsCodePro[df$BetterLife=="Yes"], name = "Yes") %>%
+  add_histogram(x = ~df$YearsCodePro[df$BetterLife=="No"], name = "No") %>%
+  add_paths(x = 0, y = 0:4660, color = "red", name = "zero") %>% 
+  layout(barmode = "overlay", title = "Distribution of centered YearsCodePro\n predictor by outcome groups", xaxis = list(title = ""))
+```
+
+As can be seen, main group of distribution is gathered left from zero and there is long tail right from zero - our distribution highly skewed. But both groups have such skew.
+
+### WorkPlan: How structured or planned is your work?
+
+```{r WorkPlan, echo=FALSE, message=FALSE, warning=FALSE}
+plot_ly() %>% 
+  add_histogram(x = ~df$WorkPlan[df$BetterLife=="Yes"], name = "Yes") %>% 
+  add_histogram(x = ~df$WorkPlan[df$BetterLife=="No"], name = "No") %>% 
+  layout(barmode = "group", title = "Distribution of WorkPlan\n predictor by outcome groups", xaxis = list(title = ""))
+```
+
+Here the same proportions of "Yes" & "No" respondents in each group of work planning except "Non-responce" group. Also can be seen, that proportion between "Yes" and "No" is slightly raising to favor of "Yes" group with raise of level work structuredness - that helps my hypothesis a little.
+
+
+### PurchaseWhat: What level of influence do you, personally, have over new technology purchases at your organization?
+
+```{r PurchaseWhat, echo=FALSE, message=FALSE, warning=FALSE}
+plot_ly() %>% 
+  add_histogram(x = ~df$PurchaseWhat[df$BetterLife=="Yes"], name = "Yes") %>% 
+  add_histogram(x = ~df$PurchaseWhat[df$BetterLife=="No"], name = "No") %>% 
+  layout(barmode = "group", title = "Distribution of PurchaseWhat\n predictor by outcome groups", xaxis = list(title = ""))
+```
+
+Here the same proportions and they changes to "Yes" group favor even more slightly, so that not really helps my hypothesis, but I will see it in model.
+
+
+## Checking distributions per each category
+
+Also I can look at *xtabs* for better view on distribution between groups:
+
+```{r distros, echo=FALSE, message=FALSE, warning=FALSE}
+xtabs(~ BetterLife + WorkPlan, data = df)
+cat("\n")
+xtabs(~ BetterLife + PurchaseWhat, data = df)
+```
+
+We have more respondents with lower levels of structuredness and influence at work - I can assume, that we have just more junior lower-aged specialists, than senior ones.
+
+Also we can notice that the higher levels of structuredness and influence at work, the more proportion between "Yes" and "No" - almost 2/1 with "high" levels. So that part of my hypothesis is slightly supported.
+
+
+# Choosing the best model
+
+Before creating a model I will split dataset into train/test subsets to gain accuracy after modelling:
+
+```{r test & train, message=FALSE, warning=FALSE}
+bound <- floor((nrow(df)/4)*3) 
+set.seed(1313)
+df <- df[sample(nrow(df)),]
+df.train <- df[1:bound, ] 
+df.test <- df[(bound+1):nrow(df), ]
+```
+
+
+And now let's build a models with different combinations (and emtpy model too) of predictors and choose the better model:
+
+```{r building models, message=FALSE, warning=FALSE}
+# main model with 3 predictors
+model <- glm(BetterLife ~ YearsCodePro + WorkPlan + PurchaseWhat, family = "binomial", data = df.train)
+# side models with 2 predictors
+model_YW <- glm(BetterLife ~ YearsCodePro + WorkPlan, family = "binomial", data = df.train)
+model_YP <- glm(BetterLife ~ YearsCodePro + PurchaseWhat, family = "binomial", data = df.train)
+model_WP <- glm(BetterLife ~ WorkPlan + PurchaseWhat, family = "binomial", data = df.train)
+# side models with 1 predictor
+model_Y <- glm(BetterLife ~ YearsCodePro, family = "binomial", data = df.train)
+model_W <- glm(BetterLife ~ WorkPlan, family = "binomial", data = df.train)
+model_P <- glm(BetterLife ~ PurchaseWhat, family = "binomial", data = df.train)
+# empty model
+model_0 <- glm(BetterLife ~ 1, family = "binomial", data = df.train)
+```
+
+
+Firstly, I will look at **LogLikelihood** to choose model with closest to zero value of it:
+
+```{r checking loglik, message=FALSE, warning=FALSE}
+library(lmtest)
+lrtest(model_YW, model_YP, model_WP, model_Y, model_W, model_P, model, model_0)
+```
+
+By LogLikelihood I see that the most complex model (seventh in a list) have better value of it and all my models are significant.
+
+```{r pseudo-R, message=FALSE, warning=FALSE}
+library(rcompanion)
+compareGLM(model_YW, model_YP, model_WP, model_Y, model_W, model_P, model, model_0)
+```
+
+And also by three different pseudo-R values seventh most complex model is the better solution, despite all models including the best one have really bad values of pseudo-R below 0.01. So all of my models are bad and have no effect, but I can compare them and choose greatest from bad.
+
+*Deciding by LogLikelihood and pseudo-R coefficients I'm choosing seventh most complex model and elaborate further analysis on it.*
+
+
+# Model summary and interpretation of coefficients
+
+```{r checking, message=FALSE, warning=FALSE}
+library(jtools) # https://cran.r-project.org/web/packages/jtools/vignettes/summ.html
+summ(model, confint = T, digits = 2, exp = T, vifs = T)
+```
+
+## Odds ratios
+
+All interpretations are to favor of "Yes" answer:
+
+  - When **YearsCodePro** increases by one unit, the odds of *BetterLife* change by a factor of 0.97 = they multiply by 0.98 = they decrease by 97 percent [95% CI = 0.97; 0.98] 
+
+  - When **WorkPlan** changes from "low" to: 
+    - "med": the odds increases by 109% 
+    - "high": the odds increases by 129% 
+    - if "Non-responce": the odds decreases by 88% 
+  - When **PurchaseWhat** changes from "low" to: 
+    - "med": the odds increases by 107% 
+    - "high": the odds increases by 131% 
+    - if "Non-responce": the odds increases by 117% 
+
+## Confidence intervals
+
+**No predictor is crossing 1 with its confidence intervals!**
+
+
+## Predicted probabilities
+
+For different factor predictors combinations:
+```{r pred_prob, message=FALSE, warning=FALSE}
+pred_data <- with(df, data.frame(YearsCodePro = mean(YearsCodePro),
+                        wp = expand.grid(unique(df$WorkPlan), unique(df$PurchaseWhat))[1],
+                        pw = expand.grid(unique(df$WorkPlan), unique(df$PurchaseWhat))[2]))
+names(pred_data) <- c("YearsCodePro", "WorkPlan", "PurchaseWhat")
+
+pred_data$pred <- predict(model, newdata = pred_data, type = "response")
+pred_data
+```
+
+Here I see that all predicted probabilities per different combinations of groups with mean of centered YearsCodePro is above 0.5 - that's not really good.
+
+
+## For different YearsCodePro values:
+```{r message=FALSE, warning=FALSE, include=FALSE}
+pred_data2 <- with(df, 
+                   data.frame(YearsCodePro = rep(seq(
+                     from = min(df$YearsCodePro), 
+                     to = max(df$YearsCodePro), length.out = 100), 4), 
+                        wp = expand.grid(unique(df$WorkPlan), unique(df$PurchaseWhat))[1],
+                        pw = expand.grid(unique(df$WorkPlan), unique(df$PurchaseWhat))[2]))
+names(pred_data2) <- c("YearsCodePro", "WorkPlan", "PurchaseWhat")
+pred_data3 <- cbind(pred_data2, predict(model, newdata = pred_data2, type = "link", se = T))
+
+pred_data3 <- within(pred_data3, {
+  PredictedProb <- plogis(fit)
+  LL <- plogis(fit - (1.96 * se.fit))
+  UL <- plogis(fit + (1.96 * se.fit))
+})
+```
+
+### With WorkPlan groups
+```{r, message=FALSE, warning=FALSE}
+library(ggplot2)
+ggplot(pred_data3, aes(x = YearsCodePro, y = PredictedProb)) +
+  geom_ribbon(aes(ymin = LL, ymax = UL, fill = WorkPlan), alpha = 0.2) +
+  geom_line(aes(colour = WorkPlan), size = 0.75) +
+  ylim(0, 1)
+```
+
+Those groups not really differ from each other, but I really have high structured work plan group above others, medium structured right below and low structured at the bottom (except Non-responce group) - that slopes help my hypothesis, the more structured respondent's work, the more that respondent thinks that his/her life better in comparison with his/her parents.
+
+But with years of coding professionally my hypothesis breakes and I see decrease of probability with more years given.
+
+
+### With PurchaseWhat groups
+```{r, message=FALSE, warning=FALSE}
+ggplot(pred_data3, aes(x = YearsCodePro, y = PredictedProb)) +
+  geom_ribbon(aes(ymin = LL, ymax = UL, fill = PurchaseWhat), alpha = 0.2) +
+  geom_line(aes(colour = PurchaseWhat), size = 0.75) +
+  ylim(0, 1)
+```
+
+Here is the same situation and slopes of influence in purchasing helps my hypothesis, but with more years of coding professionally chances decreasing.
+
+
+## Average marginal effects
+
+```{r, message=FALSE, warning=FALSE}
+library(margins)
+m <- margins(model, type = "response")
+summary(m)
+```
+
+  - if centered **YearsCodePro** changes by one unit it will decrease probability on -0.005 percent 
+  - if **PurchaseWhat** changes from "low" (with control of YearsCodePro): 
+    - to "medium" probability is greater on 0.01 percent 
+    - to "high" probability is greater on 0.06 percent 
+    - to "Non-responce" probability is greater on 0.03 percent 
+  - if **WorkPlan** changes from "low" (with control of YearsCodePro): 
+    - to "medium" probability is greater on 0.02 percent 
+    - to "high" probability is greater on 0.06 percent 
+    - to "Non-responce" probability is lesser on 0.03 percent 
+    
+
+And here I finally see that my hypothesis about structuredness and influence were right, but not about years of coding professionally!
+
+
+```{r margin_plot, fig.width=15, fig.height=10, message=FALSE, warning=FALSE}
+plot(m)
+```
+
+
+
+# Accuracy, ROC and Osius and Rojek’s test
+
+```{r confusion, echo=TRUE, message=FALSE, warning=FALSE}
+pred = format(round(predict(model, newdata=df.test, type="response")))
+
+pred <- factor(pred)
+levels(pred) <- c("No", "Yes")
+# levels(df.test$BetterLife)
+ 
+library(caret)
+library(e1071)
+confusionMatrix(table(data=pred, df.test$BetterLife))
+```
+
+With such Accuracy and No-Information rate I can claim that my model is not statistically significantly better than no model at all.
+
+
+Looking at ROC curve:
+
+```{r gof, echo=TRUE, message=FALSE, warning=FALSE}
+library(LogisticDx)
+sum_gof <- gof(model, plotROC = T)
+```
+
+AUC = 55.3% shows that my model is "useless" according to the test summary itself:
+```{r, message=FALSE, warning=FALSE}
+sum_gof$auc
+```
+
+
+Looking at significant difference between model and observed data:
+
+```{r, message=FALSE, warning=FALSE}
+sum_gof$gof
+```
+
+Our goodness-of-fit measures shows that: 
+
+  - for Hosmer and Lemeshow tests = 0.35 
+  - for Osius and Rojek’s tests = 0.04 
+  
+It is better to believe *Osius and Rojek's test*, which shows level of significance = 0.04 (and that supported by other diagnostics) and that shows us that **my model is really poor**.
+
+
+# Model diagnostics
+
+## Linearity
+
+```{r message=FALSE, warning=FALSE}
+library(car)
+car::residualPlots(model)
+```
+
+Looks strange, maybe problem lies in it?
+
+
+```{r message=FALSE, warning=FALSE}
+car::marginalModelPlots(model)
+```
+
+Here too.
+
+
+## Multicollinearity
+
+```{r, message=FALSE, warning=FALSE}
+vif(model)
+```
+
+I don't have VIF > 10, that's good!
+
+
+## Outliers
+
+```{r, message=FALSE, warning=FALSE}
+outlierTest(model)
+```
+
+```{r message=FALSE, warning=FALSE}
+influenceIndexPlot(model, id.n. = 3)
+```
+
+Some points can be outliers, but I think that doesn't change my outcome - I've already have poor fitting model :(
+
+
+## Cook’s distance
+
+```{r, message=FALSE, warning=FALSE}
+influencePlot(model, col = "red", id.n. = 3)
+```
+
+I don't have outliers, that's great!
+
+
+# Conclusion
+
+That was really interesting topic, I like logistic regression and will use it in future (just because it is interesting).
+
+And here I'm partly proved my hypotheses: about structuredness and influence, but disproved about years of coding professionally. But with such effect sizes, pseudo-Rs and accuracy I can't claim that I've built a nice model - data is also was interesting, but strange.
+
+Thanks for the topic!
+
