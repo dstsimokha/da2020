@@ -3,18 +3,11 @@ title: "DA2020 - cluster analysis project (Tsimokha Dmitriy, 161)"
 author: "Dmitriy Tsimokha"
 date: "3/14/2020"
 output:
-  pdf_document: default
-  html_document: default
+  prettydoc::html_pretty:
+    theme: cayman
+    highlight: github
 ---
 
-Your task is to clusterise R users among the participants of the Stackoverflow 2019 survey for a software company targeting R users. "R users" are defined here those who indicated they worked with the R language. Using the variables of your choice, explore the possible clustering solutions in this group, and describe the differrences between the obtained clusters of R users.
-
-Questionnaire: Stackoverflow 2019
-
-Data:  [dataforproject2.csv](https://lms.hse.ru/view_file.php?action=download&file=2166667), attached here (filtered data from Stackoverflow 2019)
-Deadline: March 10th, 11:50 PM. Later submissions have 50% off the grade.
-
-The project should be submitted as an archive with **2 files: the Rmd script and the html output**. As an alternative, you can include in your script a link to the rpubs publication or another external repo. The report should not be too lengthy or overstuffed (up to 10 A4 pages long).
 
 All projects will be graded according to the following criteria:
 
@@ -39,22 +32,144 @@ Grade descriptions:
   * 5 clusters are defined but not described, the report is not coherent
   * 4 clusters are defined, analysis has flaws in logic, but it is structured (distances are calculated, clusters are identified, and results are summarised) 
   * 3 clusters are not identified, no summary provided
-  
+
+
+# Preparations
+
 ```{r}
-library(data.table)
+set.seed(2020)
+require(data.table); require(dplyr)
 df <- fread("dataforproject2.csv", stringsAsFactors = T)
-str(df)
+df <- df %>% select(Respondent, MainBranch, Employment, EdLevel, YearsCode)
+# changing YearsCode to numeric
+df <- subset(df, YearsCode != "Less than 1 year" & YearsCode != "More than 50 years")
+df$YearsCode <- scale(as.numeric(df$YearsCode), center = F, scale = TRUE); df <- na.omit(df)
 ```
-  
+
+
+## Chosing variables
+
 To clusterize R user meaningfully I take following variables:
 
-  * Age
-  * Extraversion
-  * OpSys
-  * 
-  
+  * **MainBranch**: ** 
+  * **Employment**: ** 
+  * **EdLevel**: ** 
+  * **YearsCode**: ** 
+
+With such variables I'm tryin to cluster respondents based on 
+
+## Exploring data
+
 ```{r}
-sapply(df[,c("Age", "Extraversion", "OpSys")], summary)
+sapply(df[,c("MainBranch", "Employment", "EdLevel", "YearsCode")], summary)
 ```
-  
-  
+
+As can be seen there are more respondents satisfied with their careers and jobs, also most of them think that their managers doing fine and most respondents open for a new opportunities.
+
+# Calculating distance
+
+```{r}
+library(ISLR); library(cluster)
+gower_dist <- daisy(df[,-"Respondent"], metric = "gower", type = list(logratio = 4))
+summary(gower_dist); gower_mat <- as.matrix(gower_dist)
+```
+
+## Most similar cases
+
+```{r}
+df[which(gower_mat == min(gower_mat[gower_mat != min(gower_mat)]), arr.ind = TRUE)[1, ], ]
+```
+
+Looking nice, they really very similar to each other.
+
+## Most dissimilar cases
+
+```{r}
+df[which(gower_mat == max(gower_mat[gower_mat != max(gower_mat)]), arr.ind = TRUE)[1, ], ]
+```
+
+But here we have just the same picture, that's not good at all.
+
+## Dendrogram
+
+```{r}
+heatmap(gower_mat, symm = T,
+        distfun = function(x) as.dist(x))
+```
+
+
+# Choosing clustering solution
+
+## PAM
+
+```{r}
+sil_width <- c(NA)
+
+for(i in 2:10){
+  pam_fit <- pam(gower_dist,
+                 diss = TRUE,
+                 k = i)
+  sil_width[i] <- pam_fit$silinfo$avg.width
+}
+```
+
+```{r}
+plot(1:10, sil_width,
+     xlab = "Number of clusters", xaxt='n',
+     ylab = "Silhouette Width",
+     ylim = c(0,1))
+axis(1, at = seq(2, 10, by = 1), las=2)
+lines(1:10, sil_width)
+```
+
+I will choose **9 clusters** as optimal solution - more clusters don't gave me increase in value.
+
+### Interpret solution
+
+```{r}
+pam_fit <- pam(gower_dist, diss = TRUE, k = 9)
+
+df <- df %>%
+  dplyr::select(-Respondent) %>%
+  mutate(cluster = pam_fit$clustering)
+
+medoids <- df[pam_fit$medoids, ]
+```
+
+With medoids and plot I can describe clusters and their dissimilarities.
+
+# Visualizing clustering solution
+
+## PAM solution
+
+### Plot
+```{r}
+library(Rtsne); library(ggplot2)
+tsne_obj <- Rtsne(gower_dist, is_distance = TRUE)
+
+tsne_data <- tsne_obj$Y %>% # $Y is a matrix containing the new representations for the objects
+  data.frame() %>%
+  setNames(c("X", "Y")) %>%
+  mutate(cluster = factor(pam_fit$clustering),
+         name = df$Respondent)
+
+ggplot(aes(x = X, y = Y), data = tsne_data) +
+  geom_point(aes(color = cluster))
+```
+
+### Describing by medoids
+
+```{r}
+medoids[medoids$cluster==1,]
+```
+
+
+## AGNES
+
+```{r}
+library(factoextra)
+hfit_average <- agnes(gower_dist, method = "average")
+
+h_avg_cut <- hcut(gower_dist, k = 8, hc_method = "ward")
+fviz_cluster(h_avg_cut, iris.use, ellipse.type = "convex")
+```
