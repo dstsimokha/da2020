@@ -1,21 +1,16 @@
 ---
-title: "DA2020 - cluster analysis project (Tsimokha Dmitriy, 161)"
+title: "DA2020 - cluster analysis project (Tsimokha Dmitriy)"
 author: "Dmitriy Tsimokha"
 date: "3/14/2020"
 output:
   prettydoc::html_pretty:
-    theme: cayman
+    theme: leonids
     highlight: github
 ---
 
+[link to the code on repo](https://github.com/dstsimokha/da2020/blob/master/cl_an/project.Rmd)
 
-All projects will be graded according to the following criteria:
-
-  4-5) you have tried a combination of k-means/PAM and agglomerative clustering - 2 points
-  7) decision on how many clusters to retain is based on tests/ dendrograms - 1 point
-  8) comments on which clustering method delivers better results - 1 point
-  9) the resulting clusters are described and labelled - 1.4 points
-  10) the cluster solution is validated with any other methods (including but not limited to: PCA, regression, etc.) - 1 point
+[link to the GitHub Page](http://mglotov.me/da2020/cl_an/project.html)
 
 
 # Preparations
@@ -120,9 +115,10 @@ heatmap(gower_mat, symm = T,
 
 This is looks like too much clusters, more than 10, not really nice, but as I think it highly depends on data and there are some issues with it so I can't do anything.
 
+
 # PAM
 
-Firstly, I will clusterize data with PAM and use medoids to describe my clusters:
+Firstly, I will clusterize data with PAM and describe my clusters:
 
 ```{r message=FALSE, warning=FALSE}
 sil_width <- c(NA)
@@ -133,9 +129,7 @@ for(i in 2:10){
                  k = i)
   sil_width[i] <- pam_fit$silinfo$avg.width
 }
-```
 
-```{r message=FALSE, warning=FALSE}
 plot(1:10, sil_width,
      xlab = "Number of clusters", xaxt='n',
      ylab = "Silhouette Width",
@@ -144,16 +138,15 @@ axis(1, at = seq(2, 10, by = 1), las=2)
 lines(1:10, sil_width)
 ```
 
-I will choose **9 clusters** as optimal solution - more clusters don't gave me increase in value. That is useless, but nothing can be done about it.
+I will choose **5 clusters** as optimal solution - more clusters can increase value but not so much and it will be hard to interpret that much clusters.
 
 ```{r message=FALSE, warning=FALSE}
-pam_fit <- pam(gower_dist, diss = TRUE, k = 9)
+pam_fit <- pam(gower_dist, diss = TRUE, k = 5)
 
-df <- df %>%
-  dplyr::select(-Respondent) %>%
-  mutate(cluster = pam_fit$clustering)
-
-medoids <- df[pam_fit$medoids, ]
+pam_results <- df %>%
+  mutate(cluster = pam_fit$clustering) %>%
+  group_by(cluster) %>%
+  do(the_summary = summary(.))
 ```
 
 With medoids and plot I can describe clusters and their dissimilarities, but firtsly I will visualize my solution:
@@ -165,7 +158,7 @@ With medoids and plot I can describe clusters and their dissimilarities, but fir
 library(Rtsne); library(ggplot2)
 tsne_obj <- Rtsne(gower_dist, is_distance = TRUE)
 
-tsne_data <- tsne_obj$Y %>% # $Y is a matrix containing the new representations for the objects
+tsne_data <- tsne_obj$Y %>%
   data.frame() %>%
   setNames(c("X", "Y")) %>%
   mutate(cluster = factor(pam_fit$clustering),
@@ -175,20 +168,89 @@ ggplot(aes(x = X, y = Y), data = tsne_data) +
   geom_point(aes(color = cluster))
 ```
 
-Looks awful, but I have three factor variables and only one numeric, so it's fine for such set of varibles and given data. Again, there is nothing can be said about clusters themselves by such plot, it is better to use medoids for description:
+Looks awful, but I have three factor variables and only one numeric, so it's fine for such set of varibles and given data. Again, there is nothing can be said about clusters themselves by such plot, so it is better to describe clusters by summary:
 
 
-## Medoids
+## Describing clusters
 
-```{r message=FALSE, warning=FALSE}
+```{r packages, message=FALSE, warning=FALSE, include=FALSE}
 library(knitr)
 library(kableExtra)
-kable(medoids, caption = "Describing clusters by medoids") %>%
-  kable_styling(bootstrap_options = c("striped", "hover"), full_width = F) %>% 
-  column_spec(6, bold = T, border_left = T)
 ```
 
-That clustering solution don't have medoids around 2 groups from MainBranch - hobbyist and ex-developers (maybe because this groups are smallest ones). Also there are only two groups of pre-degree respondents, three of masters and higher and four with bachelor degree - clustering solution still get more cluster on biggest groups. And it's hard to describe scaled and logarithmed years of coding professionally variable, but variance looks nice.
+```{r cluster1, echo=FALSE, message=FALSE, warning=FALSE}
+kable(pam_results$the_summary[[1]], caption = "Cluster 1") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = F)
+```
 
-So that solution is weirdly looking but still gave nice medoids and from that - fine clusters.
+**First** cluster mostly about employed partly-developers with bachelor degree and mean years of coding pro equals 0.8
+
+```{r cluster2, echo=FALSE, message=FALSE, warning=FALSE}
+kable(pam_results$the_summary[[2]], caption = "Cluster 2") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = F)
+```
+
+**Second** cluster primarly about employed developers with master of higher degree and lesser years of coding pro equals to 0.7
+
+```{r cluster3, echo=FALSE, message=FALSE, warning=FALSE}
+kable(pam_results$the_summary[[3]], caption = "Cluster 3") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = F)
+```
+
+**Third** cluster is about partly or not employed students who are still studying but have greater mean of years of coding pro equals 0.96
+
+```{r cluster4, echo=FALSE, message=FALSE, warning=FALSE}
+kable(pam_results$the_summary[[4]], caption = "Cluster 4") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = F)
+```
+
+**Fourth** cluster is about partly-developers with jobs and master or higher degree and similar to second cluster mean of years coding pro
+
+```{r cluster5, echo=FALSE, message=FALSE, warning=FALSE}
+kable(pam_results$the_summary[[5]], caption = "Cluster 5") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = F)
+```
+
+**Fifth** cluster, the last one, consists from employed developers with bachelor degree and greater mean of years of coding pro equals 0.9
+
+```{r comparison, echo=FALSE, message=FALSE, warning=FALSE}
+library(compareGroups)
+df_clus <- df %>%
+  mutate(cluster = pam_fit$clustering)
+group <- compareGroups(cluster~., data = df_clus)
+clustab <- createTable(group)
+clustab
+```
+
+And maybe it will be more interesting to look at comparison table.
+
+So there are nice clusters really separate from each other on all dimensions, I think that is fine solution.
+
+
+# Other clustering method
+
+(Source)[https://www.datanovia.com/en/blog/types-of-clustering-methods-overview-and-quick-start-r-code/]
+
+```{r}
+library(factoextra)
+res.hc <- hclust(gower_dist, method = "ward.D2")
+
+fviz_dend(res.hc, k = 5,
+          cex = 0.5,
+          color_labels_by_k = TRUE,
+          rect = TRUE
+          )
+```
+
+Looks nice and that's all for now!
+
+But later I will try to explore this topic and understand more about different techniques, thank you for the course!
+
+```{r eval=FALSE, message=FALSE, warning=FALSE, include=FALSE}
+library(FactoMineR)
+res.mca <- MFA(df[,-"Respondent"], group = c(), type = c("s","n","n","n"),
+               graph=FALSE)
+
+res.hcpc <- HCPC(res.mca, graph = FALSE, max = 3)
+```
 

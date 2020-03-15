@@ -5,4 +5,4 @@
 
   - **cl_an**: directory for *cluster analysis* [project](cl_an/project.html) 
 
-  - **da_cl**: directory for *data culture** classes
+  - **da_cl**: directory for *data culture* classes
