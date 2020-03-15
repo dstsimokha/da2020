@@ -1,12 +1,3 @@
----
-title: "DA2020 - cluster analysis project (Tsimokha Dmitriy, 161)"
-author: "Dmitriy Tsimokha"
-output:
-  prettydoc::html_pretty:
-    theme: cayman
-    highlight: github
----
-
 # da2020: notes from Data Anaysis classes in 2020
 
 
