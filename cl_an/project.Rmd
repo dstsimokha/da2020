@@ -11,39 +11,49 @@ output:
 
 All projects will be graded according to the following criteria:
 
-  1) data are described (name 1-3 important characteristics of your data) - 0.6 points
-  2) variable choice is justified (you may want to use not all the variables) - 1 point
-  3) the distance metric matches variable types - 1 point (if this is incorrect, interpretation will fail)
   4-5) you have tried a combination of k-means/PAM and agglomerative clustering - 2 points
-  6) clusters have been visualized - 1 point
   7) decision on how many clusters to retain is based on tests/ dendrograms - 1 point
   8) comments on which clustering method delivers better results - 1 point
   9) the resulting clusters are described and labelled - 1.4 points
   10) the cluster solution is validated with any other methods (including but not limited to: PCA, regression, etc.) - 1 point
 
-Original solutions are especially welcomed.
-
-Grade descriptions:
-
-  * 9-10 clusters are defined, described, and named the report is coherent and complete 
-  * 8 clusters are defined, described, and named but 1-2 minor mistakes are allowed
-  * 7 clusters are defined and described but a minor part is missing or the report contains several minor mistakes 
-  * 6 clusters are defined and described but a minor part is missing or at least one serious mistake is made 
-  * 5 clusters are defined but not described, the report is not coherent
-  * 4 clusters are defined, analysis has flaws in logic, but it is structured (distances are calculated, clusters are identified, and results are summarised) 
-  * 3 clusters are not identified, no summary provided
-
 
 # Preparations
 
-```{r}
+Firsly, I will transform chosen variables to more applicable forms and omit NA values for better clusterization:
+
+(and also I will scale YearsCode variable but not center to avoid getting NaNs because later I will logarithm it)
+
+```{r message=FALSE, warning=FALSE}
 set.seed(2020)
 require(data.table); require(dplyr)
 df <- fread("dataforproject2.csv", stringsAsFactors = T)
 df <- df %>% select(Respondent, MainBranch, Employment, EdLevel, YearsCode)
 # changing YearsCode to numeric
 df <- subset(df, YearsCode != "Less than 1 year" & YearsCode != "More than 50 years")
-df$YearsCode <- scale(as.numeric(df$YearsCode), center = F, scale = TRUE); df <- na.omit(df)
+# not centering to not achieve NaNs later in daisy() when log this variable
+df$YearsCode <- scale(as.numeric(df$YearsCode), center = F, scale = T); df <- na.omit(df)
+# creating less groups to get smaller matrix later
+# for MainBranch
+levels(df$MainBranch) <- c("Developer", "Student", "Partly-developer", "Hobbyist", "Ex-developer")
+# for Employment
+df$Employment <- df %>% 
+  transmute(Employment = 
+              fifelse(Employment == "Employed full-time", "Employed", "Partly or not employed"))
+df$Employment <- as.factor(df$Employment)
+# for Education
+df$EdLevel <- df %>% 
+  transmute(EdLevel = 
+              fifelse(EdLevel == "I never completed any formal education" | 
+                      EdLevel == "Primary/elementary school" | 
+                      EdLevel == "Secondary school (e.g. American high school, German Realschule or Gymnasium, etc.)" |
+                      EdLevel == "Professional degree (JD, MD, etc.)" | 
+                      EdLevel == "Some college/university study without earning a degree", 
+                  "Pre-degree", 
+              fifelse(EdLevel == "Bachelor’s degree (BA, BS, B.Eng., etc.)", 
+                  "Bachelor degree", 
+                  "Master of higher degree")))
+df$EdLevel <- as.factor(df$EdLevel)
 ```
 
 
@@ -51,58 +61,70 @@ df$YearsCode <- scale(as.numeric(df$YearsCode), center = F, scale = TRUE); df <-
 
 To clusterize R user meaningfully I take following variables:
 
-  * **MainBranch**: ** 
-  * **Employment**: ** 
-  * **EdLevel**: ** 
-  * **YearsCode**: ** 
+  * **MainBranch**: *how close respondent to developing and programming* (but what about data analysis? - that's not developing, to highly depends on code-writing especially ML\NN linked jobs) 
+  * **Employment**: *about job format, and I recoded it into two groups* 
+  * **EdLevel**: *respondent's level of education, too recoded but into 3 groups* 
+  * **YearsCode**: *scaled continuous variable about how many years respondent write code professionaly* 
 
-With such variables I'm tryin to cluster respondents based on 
+With such variables I'm tryin to cluster respondents based on their level of coding experience and for that purpose I chose small but nice set of variables, described above.
 
 ## Exploring data
 
-```{r}
+After preparing and recoding data (and choosing variables) there is need to describe structure of dataset:
+
+```{r message=FALSE, warning=FALSE}
 sapply(df[,c("MainBranch", "Employment", "EdLevel", "YearsCode")], summary)
 ```
 
-As can be seen there are more respondents satisfied with their careers and jobs, also most of them think that their managers doing fine and most respondents open for a new opportunities.
+  * **MainBranch**: the biggest group is developers, half-sized of that group is respondents who partly using code in their work, then about 630 respondents are students and lastly two groups about hundred respondents each consist hobbyist and ex-developers. *So there are huge amount of professional developers, more than half of the whole sample* 
+  * **Employment**: nearly two thirds of a sample fully employed and other third partly of not employed
+  * **EdLevel**: about half of the whole sample are ones with master degree or higher (PhD and so on), half-sized of that is group of bachelors and there is really small group of respondents without a degree
+  * **YearsCode**: and that variable is centered and scaled, so there is nothing about it can be described now.
 
 # Calculating distance
 
-```{r}
+Firstly, I need to calculate distance before clustering anything and I choose *daisy()* function and *gower* distance metric because three variables are factors and only one is continuous, so there is need to chose algorithm and metric applicable for mixed data:
+
+*(and also I delete respondents ids because such variable is meaningless in clusterization - but still I have it in my dataset, maybe I need it later)*
+
+```{r message=FALSE, warning=FALSE}
 library(ISLR); library(cluster)
 gower_dist <- daisy(df[,-"Respondent"], metric = "gower", type = list(logratio = 4))
 summary(gower_dist); gower_mat <- as.matrix(gower_dist)
 ```
 
+Distance calculated and mean is on 0.5 - from that I can predict concentration of observation in the center and great variation and overlapping clusters, that is not good at all, but I still will try to test my set of variables.
+
 ## Most similar cases
 
-```{r}
+```{r message=FALSE, warning=FALSE}
 df[which(gower_mat == min(gower_mat[gower_mat != min(gower_mat)]), arr.ind = TRUE)[1, ], ]
 ```
 
-Looking nice, they really very similar to each other.
+Looks like identical twins, nice!
 
 ## Most dissimilar cases
 
-```{r}
+```{r message=FALSE, warning=FALSE}
 df[which(gower_mat == max(gower_mat[gower_mat != max(gower_mat)]), arr.ind = TRUE)[1, ], ]
 ```
 
-But here we have just the same picture, that's not good at all.
+So there is not or partly employed bachelor student vs. partly-coder with master of higher degree epmployee with great difference in years of coding professionally - works nice too, but I assumed there will be master developer vs. partly-remployed respondent without a degree.
 
 ## Dendrogram
 
-```{r}
+```{r message=FALSE, warning=FALSE}
 heatmap(gower_mat, symm = T,
         distfun = function(x) as.dist(x))
 ```
 
+This is looks like too much clusters, more than 10, not really nice, but as I think it highly depends on data and there are some issues with it so I can't do anything.
 
-# Choosing clustering solution
+# PAM
 
-## PAM
+Firstly, I will clusterize data with PAM and use medoids to describe my clusters:
 
-```{r}
+```{r message=FALSE, warning=FALSE}
 sil_width <- c(NA)
 
 for(i in 2:10){
@@ -113,7 +135,7 @@ for(i in 2:10){
 }
 ```
 
-```{r}
+```{r message=FALSE, warning=FALSE}
 plot(1:10, sil_width,
      xlab = "Number of clusters", xaxt='n',
      ylab = "Silhouette Width",
@@ -122,11 +144,9 @@ axis(1, at = seq(2, 10, by = 1), las=2)
 lines(1:10, sil_width)
 ```
 
-I will choose **9 clusters** as optimal solution - more clusters don't gave me increase in value.
+I will choose **9 clusters** as optimal solution - more clusters don't gave me increase in value. That is useless, but nothing can be done about it.
 
-### Interpret solution
-
-```{r}
+```{r message=FALSE, warning=FALSE}
 pam_fit <- pam(gower_dist, diss = TRUE, k = 9)
 
 df <- df %>%
@@ -136,14 +156,12 @@ df <- df %>%
 medoids <- df[pam_fit$medoids, ]
 ```
 
-With medoids and plot I can describe clusters and their dissimilarities.
+With medoids and plot I can describe clusters and their dissimilarities, but firtsly I will visualize my solution:
 
-# Visualizing clustering solution
 
-## PAM solution
+## Visualizing solution
 
-### Plot
-```{r}
+```{r message=FALSE, warning=FALSE}
 library(Rtsne); library(ggplot2)
 tsne_obj <- Rtsne(gower_dist, is_distance = TRUE)
 
@@ -157,19 +175,20 @@ ggplot(aes(x = X, y = Y), data = tsne_data) +
   geom_point(aes(color = cluster))
 ```
 
-### Describing by medoids
+Looks awful, but I have three factor variables and only one numeric, so it's fine for such set of varibles and given data. Again, there is nothing can be said about clusters themselves by such plot, it is better to use medoids for description:
 
-```{r}
-medoids[medoids$cluster==1,]
+
+## Medoids
+
+```{r message=FALSE, warning=FALSE}
+library(knitr)
+library(kableExtra)
+kable(medoids, caption = "Describing clusters by medoids") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = F) %>% 
+  column_spec(6, bold = T, border_left = T)
 ```
 
+That clustering solution don't have medoids around 2 groups from MainBranch - hobbyist and ex-developers (maybe because this groups are smallest ones). Also there are only two groups of pre-degree respondents, three of masters and higher and four with bachelor degree - clustering solution still get more cluster on biggest groups. And it's hard to describe scaled and logarithmed years of coding professionally variable, but variance looks nice.
 
-## AGNES
+So that solution is weirdly looking but still gave nice medoids and from that - fine clusters.
 
-```{r}
-library(factoextra)
-hfit_average <- agnes(gower_dist, method = "average")
-
-h_avg_cut <- hcut(gower_dist, k = 8, hc_method = "ward")
-fviz_cluster(h_avg_cut, iris.use, ellipse.type = "convex")
-```
