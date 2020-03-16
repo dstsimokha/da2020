@@ -1,0 +1,406 @@
+---
+title: "Homework #2"
+author: "Dmitriy Tsimokha, 161"
+date: "17/03/2020"
+fontsize: 12pt
+output: 
+  pdf_document: 
+    latex_engine: xelatex
+header-includes:
+  - \usepackage{fontspec}
+  - \usepackage[dvipsnames]{xcolor}
+  - \setmainfont{Ubuntu}
+  - \setlength{\parindent}{4em}
+  - \setlength{\parskip}{1em}
+  - \renewcommand{\baselinestretch}{1.15}
+---
+
+```{r, message=FALSE, warning=FALSE, include=FALSE}
+# For that report I used some of the LaTeX functions:
+# If you want to apply something for the whole document - write it in the "header-includes" section above
+# Useful source - https://www.overleaf.com/learn/latex/XeLaTeX
+# Add some packages like fontspec and xcolor, and then you can use their functions in header of inside text (like I did with colors)
+```
+
+
+Hello, Eduard Dmitrievych! I worked on that task in R, created plots and PDF document too inside R, so sorry for such heading and spaces, I'm trying to keep my work inside one instrument (R in that case). 
+
+[\colorbox{ProcessBlue}{Link for data source here}](https://www.gks.ru/folder/210/document/47652)
+
+```{r loading, message=FALSE, warning=FALSE, include=FALSE}
+# You need to install packages below especially archive package
+# install.packages("devtools")
+# devtools::install_github("jimhester/archive")
+# And then don't forget to install TeX on your computer - that's not the package for R, you need to install program itself
+library(data.table); library(archive); library(plotly)
+# In the line below I'm downloading .rar archive to the folder with this report
+download.file("https://www.gks.ru/storage/mediabank/pril-region19.rar", "book19.rar")
+# And then extracting that archive to the folder "table" and taking only table which I need
+archive_extract("book19.rar", "table", "Раздел 3- Уровень жизни населения .xlsx")
+```
+
+
+For this work I chose Russia as whole country, Moscow & St.Petersburg, Bryanskaya oblast' and Primorskiy kray - I chose last two because it is interesting for me to look at how differently can people live near the Ukraine and as far as they can from that country in period from 2000 to 2018, when in 2014 there was known to all of us situation with Maidan.
+
+I suppose, that situation with Ukraine influenced people in Bryanskaya oblast' way more than their far neighbours from Prymorskiy kray.
+
+So in that work I will describe how situation with Ukraine influenced on Russia overall and russian population in specific regions - that situation in 2014 brings Russia new territory, but also weakened rouble in comparison with dollar and euro.
+
+# Metric #1: Real population income
+
+```{r figure1, message=FALSE, warning=FALSE, include=FALSE}
+# Here I use function with library without loading it, so don't forget to install readxl!
+df <- readxl::read_xlsx("table/Раздел 3- Уровень жизни населения .xlsx", sheet = "3.1.1.", skip = 6, n_max = 98)
+names(df)[1] <- "Region"
+
+fig <- plot_ly(df,
+        x = ~c(2000:2018),
+        y = ~as.numeric(df[df$Region == "Российская Федерация",-1]),
+        type = "scatter", mode = "lines", name = "RUSSIA", line = list(dash = "solid")) %>% 
+        layout(title = "Real population income (in percentage to previous year)",
+               xaxis = list(title = "Year"),
+               yaxis = list (title = "Percentage"))
+fig <- fig %>% 
+  add_trace(y = ~as.numeric(df[df$Region == "г. Москва",-1]), 
+            name = "Moscow", line = list(dash = "dot"))
+fig <- fig %>% 
+  add_trace(y = ~as.numeric(df[df$Region == "г. Санкт-Петербург",-1]), 
+            name = "St.Petersburg", line = list(dash = "dash"))
+fig <- fig %>% 
+  add_trace(y = ~as.numeric(df[df$Region == "Брянская область",-1]), 
+            name = "Bryanskaya oblast'", line = list(dash = "longdash"))
+fig <- fig %>% 
+  add_trace(y = ~as.numeric(df[df$Region == "Приморский край",-1]), 
+            name = "Prymorskiy kray", line = list(dash = "dashdot"))
+fig <- fig %>% layout(legend = list(x = 0.8, y = 0.8))
+# And here the most unusial part - you need to install orca - https://github.com/plotly/orca#installation
+# And then you will be able to save interactive plots as pictures and use them in static PDF
+# Yeah, sounds stupid, but that was interesting to solve such problem - I'm a big fan of Plotly and always wants to use it
+orca(fig, "fig1.png")
+```
+
+![](fig1.png)
+
+As can be seen from the plot from 2000 to 2014 there was **increase** of real population income for Russia at all (*\textcolor{Cyan}{blue line was above the 100 percent}*), then there was a drop in growth of income, and assuming that presented data is in percentage per previous year, Russia still not on the same level of growth as before. Before 2014 there was stable linear growth in income for Russia ~110-115% per year till 2007-2008 and after that growth decreased to 102-105% per year till 2014 - I suppose, that happened because of economic crisis in 2008.
+
+In the same time, income for \textcolor{Red}{Bryanskaya oblast'} and \textcolor{Violet}{Primorskiy kray} changes really closely to overall trend for Russia and there are no major fluctuations from the country mean.
+
+But for \textcolor{Orange}{Moscow} and \textcolor{Green}{St.Peterburg} there are major differences from the mean - it looks like those cities feel changes before other regions and feel those changes in more extreme way.
+
+
+# Metric #2: Number of retired people
+
+```{r figure2, message=FALSE, warning=FALSE, include=FALSE}
+# 3.7.2. ЧИСЛЕННОСТЬ ПЕНСИОНЕРОВ (на 1000 человек населения)
+df <- readxl::read_xlsx("table/Раздел 3- Уровень жизни населения .xlsx", sheet = "3.7.2.", skip = 5, n_max = 98)
+names(df)[1] <- "Region"; df[1,1] <- "Российская Федерация"
+
+fig <- plot_ly(df,
+        x = ~c(2000:2019),
+        y = ~as.numeric(df[df$Region == "Российская Федерация",-1]),
+        type = "scatter", mode = "lines", name = "RUSSIA", line = list(dash = "solid")) %>% 
+        layout(title = "Number of retired people (per thousand)",
+               xaxis = list(title = "Year"),
+               yaxis = list (title = "Number of retired people per thousand"))
+fig <- fig %>% 
+  add_trace(y = ~as.numeric(df[df$Region == "г. Москва",-1]), 
+            name = "Moscow", line = list(dash = "dot"))
+fig <- fig %>% 
+  add_trace(y = ~as.numeric(df[df$Region == "г. Санкт-Петербург",-1]), 
+            name = "St.Petersburg", line = list(dash = "dash"))
+fig <- fig %>% 
+  add_trace(y = ~as.numeric(df[df$Region == "Брянская область",-1]), 
+            name = "Bryanskaya oblast'", line = list(dash = "longdash"))
+fig <- fig %>% 
+  add_trace(y = ~as.numeric(df[df$Region == "Приморский край",-1]), 
+            name = "Prymorskiy kray", line = list(dash = "dashdot"))
+fig <- fig %>% layout(legend = list(x = 0.8, y = 0.86))
+orca(fig, "fig2.png")
+```
+
+![](fig2.png)
+
+Overall trend for \textcolor{Cyan}{Russia} increases and that's normal - with more time and nice medicine we will have more elderly people. But more interesting to look for a lines of \textcolor{Orange}{Moscow} and \textcolor{Green}{St.Petersburg} - there are much lesser increase (and even was a decrease for Moscow in 2000-2009 period), so that's compensated by rapid growth in observed regions. I can assume, that this happening because of urbanisation trends and all younger people tend to move in capitals.
+
+
+# Metric #3: Minimal living wage
+
+```{r figure3, message=FALSE, warning=FALSE, include=FALSE}
+# 3 - 3.11. ВЕЛИЧИНА ПРОЖИТОЧНОГО МИНИМУМА, УСТАНОВЛЕННАЯ В ЦЕЛОМ ПО РОССИЙСКОЙ ФЕДЕРАЦИИ И В СУБЪЕКТАХ РОССИЙСКОЙ ФЕДЕРАЦИИ
+df <- readxl::read_xlsx("table/Раздел 3- Уровень жизни населения .xlsx", sheet = "3.11. ", skip = 5, n_max = 98)
+names(df)[1] <- "Region"
+
+fig <- plot_ly(df,
+        x = ~c(2001:2018),
+        y = ~as.numeric(df[df$Region == "Российская Федерация",-1]),
+        type = "scatter", mode = "lines", name = "RUSSIA", line = list(dash = "solid")) %>% 
+        layout(title = "Minimal living wage",
+               xaxis = list(title = "Year"),
+               yaxis = list (title = "Wage"))
+fig <- fig %>% 
+  add_trace(y = ~as.numeric(df[df$Region == "г. Москва",-1]), 
+            name = "Moscow", line = list(dash = "dot"))
+fig <- fig %>% 
+  add_trace(y = ~as.numeric(df[df$Region == "г. Санкт-Петербург",-1]), 
+            name = "St.Petersburg", line = list(dash = "dash"))
+fig <- fig %>% 
+  add_trace(y = ~as.numeric(df[df$Region == "Брянская область",-1]), 
+            name = "Bryanskaya oblast'", line = list(dash = "longdash"))
+fig <- fig %>% 
+  add_trace(y = ~as.numeric(df[df$Region == "Приморский край",-1]), 
+            name = "Prymorskiy kray", line = list(dash = "dashdot"))
+fig <- fig %>% layout(legend = list(x = 0.1, y = 0.8))
+orca(fig, "fig3.png")
+```
+
+![](fig3.png)
+
+There are rapid growth in all subjects, but such image can fool us - there was currency denomination and hyperinflation, so such **numbers can be tricky**.
+
+# Metric #4: Number of people with income lover than minimal living wage
+
+```{r figure4, message=FALSE, warning=FALSE, include=FALSE}
+# 4 - 3.13. ЧИСЛЕННОСТЬ НАСЕЛЕНИЯ С ДЕНЕЖНЫМИ ДОХОДАМИ НИЖЕ ВЕЛИЧИНЫ ПРОЖИТОЧНОГО МИНИМУМА (в процентах от общей численности населения  субъекта)
+df <- readxl::read_xlsx("table/Раздел 3- Уровень жизни населения .xlsx", sheet = "3.13.", skip = 5, n_max = 98)
+names(df)[1] <- "Region"; df[1,1] <- "Российская Федерация"
+
+fig <- plot_ly(df,
+        x = ~c(2000:2018),
+        y = ~as.numeric(df[df$Region == "Российская Федерация",-1]),
+        type = "scatter", mode = "lines", name = "RUSSIA", line = list(dash = "solid")) %>% 
+        layout(title = "Number of people with income lover than minimal living wage",
+               xaxis = list(title = "Year"),
+               yaxis = list (title = "Percent from subject population"))
+fig <- fig %>% 
+  add_trace(y = ~as.numeric(df[df$Region == "г. Москва",-1]), 
+            name = "Moscow", line = list(dash = "dot"))
+fig <- fig %>% 
+  add_trace(y = ~as.numeric(df[df$Region == "г. Санкт-Петербург",-1]), 
+            name = "St.Petersburg", line = list(dash = "dash"))
+fig <- fig %>% 
+  add_trace(y = ~as.numeric(df[df$Region == "Брянская область",-1]), 
+            name = "Bryanskaya oblast'", line = list(dash = "longdash"))
+fig <- fig %>% 
+  add_trace(y = ~as.numeric(df[df$Region == "Приморский край",-1]), 
+            name = "Prymorskiy kray", line = list(dash = "dashdot"))
+fig <- fig %>% layout(legend = list(x = 0.8, y = 0.8))
+orca(fig, "fig4.png")
+```
+
+![](fig4.png)
+
+Here are some interesting lines - for \textcolor{Orange}{Moscow} and \textcolor{Green}{St.Petersburg} percent of people with income below minimal living wage always lower than overall percent for \textcolor{Cyan}{Russia} and for regions as \textcolor{Red}{Bryanskaya oblast'} and \textcolor{Violet}{Primorskiy kray} percentage always higher - so there is great variation between country subjects.
+
+But nowadays those lines tend to be closer to each other so there is some hope that equality :)
+
+# Metric #5: Consumers spends
+
+```{r figure5, message=FALSE, warning=FALSE, include=FALSE}
+# 5 - 3.14. ПОТРЕБИТЕЛЬСКИЕ РАСХОДЫ В СРЕДНЕМ НА ДУШУ НАСЕЛЕНИЯ
+df <- readxl::read_xlsx("table/Раздел 3- Уровень жизни населения .xlsx", sheet = "3.14.", skip = 5, n_max = 98)
+names(df)[1] <- "Region"
+
+fig <- plot_ly(df,
+        x = ~c(2000:2018),
+        y = ~as.numeric(df[df$Region == "Российская Федерация",-1]),
+        type = "scatter", mode = "lines", name = "RUSSIA", line = list(dash = "solid")) %>% 
+        layout(title = "Consumers spends per capita (in roubles)",
+               xaxis = list(title = "Year"),
+               yaxis = list (title = "Spends in roubles per capita"))
+fig <- fig %>% 
+  add_trace(y = ~as.numeric(df[df$Region == "г. Москва",-1]), 
+            name = "Moscow", line = list(dash = "dot"))
+fig <- fig %>% 
+  add_trace(y = ~as.numeric(df[df$Region == "г. Санкт-Петербург",-1]), 
+            name = "St.Petersburg", line = list(dash = "dash"))
+fig <- fig %>% 
+  add_trace(y = ~as.numeric(df[df$Region == "Брянская область",-1]), 
+            name = "Bryanskaya oblast'", line = list(dash = "longdash"))
+fig <- fig %>% 
+  add_trace(y = ~as.numeric(df[df$Region == "Приморский край",-1]), 
+            name = "Prymorskiy kray", line = list(dash = "dashdot"))
+fig <- fig %>% layout(legend = list(x = 0.1, y = 0.8))
+orca(fig, "fig5.png")
+```
+
+![](fig5.png)
+
+And here again great variation and it's growing through years this time - for \textcolor{Orange}{Moscow} there is rapid growth and great numbers for spends, this line too far from overall trend. For \textcolor{Green}{St.Petersburg} line too higher than for whole \textcolor{Cyan}{Russia}, but still much lesser that for main capital - maybe because all of the money and big companies concentrated in our capital and there is higher standarts of living in the city.
+
+# Metric #6: Number of personal autos
+
+```{r figure6, message=FALSE, warning=FALSE, include=FALSE}
+# 6 - 3.17. ЧИСЛО СОБСТВЕННЫХ ЛЕГКОВЫХ АВТОМОБИЛЕЙ на 1000 человек населения
+df <- readxl::read_xlsx("table/Раздел 3- Уровень жизни населения .xlsx", sheet = "3.17.", skip = 5, n_max = 98)
+names(df)[1] <- "Region"; df[34,1] <- "г. Санкт-Петербург"
+
+fig <- plot_ly(df,
+        x = ~c(2000:2018),
+        y = ~as.numeric(df[df$Region == "Российская Федерация",-1]),
+        type = "scatter", mode = "lines", name = "RUSSIA", line = list(dash = "solid")) %>% 
+        layout(title = "Number of personal autos",
+               xaxis = list(title = "Year"),
+               yaxis = list (title = "Autos per thousand of people"))
+fig <- fig %>% 
+  add_trace(y = ~as.numeric(df[df$Region == "г. Москва",-1]), 
+            name = "Moscow", line = list(dash = "dot"))
+fig <- fig %>% 
+  add_trace(y = ~as.numeric(df[df$Region == "г. Санкт-Петербург",-1]), 
+            name = "St.Petersburg", line = list(dash = "dash"))
+fig <- fig %>% 
+  add_trace(y = ~as.numeric(df[df$Region == "Брянская область",-1]), 
+            name = "Bryanskaya oblast'", line = list(dash = "longdash"))
+fig <- fig %>% 
+  add_trace(y = ~as.numeric(df[df$Region == "Приморский край",-1]), 
+            name = "Prymorskiy kray", line = list(dash = "dashdot"))
+fig <- fig %>% layout(legend = list(x = 0.1, y = 0.9))
+orca(fig, "fig6.png")
+```
+
+![](fig6.png)
+
+Really interesting how both capitals in last years remain number of autos on the same level - I suppose, there is something with global ecological trends and smaller taxi cost (and its usefulness). But for regions numbers still growing rapidly and I can assume that for \textcolor{Violet}{Primorskiy kray} it can happen because of closeness of China and Japan, biggest producers of autos in the worls. At the same time \textcolor{Red}{Bryanskaya oblast'} have rapid growth too, but I suppose mainly because people here don't think much about ecology and don't use taxis. 
+
+And maybe because people moving from regions to capitals, so there is can be just decrease in subject population and not that much of increase in a number of autos.
+
+# Metric #7: Consumed meat and meat-products
+
+```{r figure7, message=FALSE, warning=FALSE, include=FALSE}
+# 7 - 3.18. ПОТРЕБЛЕНИЕ МЯСА И МЯСОПРОДУКТОВ (включая субпродукты II категории и жир-сырец) на душу населения (кг)
+df <- readxl::read_xlsx("table/Раздел 3- Уровень жизни населения .xlsx", sheet = "3.18.", skip = 5, n_max = 98)
+names(df)[1] <- "Region"
+
+fig <- plot_ly(df,
+        x = ~c(2000:2018),
+        y = ~as.numeric(df[df$Region == "Российская Федерация",-1]),
+        type = "scatter", mode = "lines", name = "RUSSIA", line = list(dash = "solid")) %>% 
+        layout(title = "Consumed meat and meat-products (per capita)",
+               xaxis = list(title = "Year"),
+               yaxis = list (title = "Kilograms per capita"))
+fig <- fig %>% 
+  add_trace(y = ~as.numeric(df[df$Region == "г. Москва",-1]), 
+            name = "Moscow", line = list(dash = "dot"))
+fig <- fig %>% 
+  add_trace(y = ~as.numeric(df[df$Region == "г. Санкт-Петербург",-1]), 
+            name = "St.Petersburg", line = list(dash = "dash"))
+fig <- fig %>% 
+  add_trace(y = ~as.numeric(df[df$Region == "Брянская область",-1]), 
+            name = "Bryanskaya oblast'", line = list(dash = "longdash"))
+fig <- fig %>% 
+  add_trace(y = ~as.numeric(df[df$Region == "Приморский край",-1]), 
+            name = "Prymorskiy kray", line = list(dash = "dashdot"))
+fig <- fig %>% layout(legend = list(x = 0.8, y = 0.2))
+orca(fig, "fig7.png")
+```
+
+![](fig7.png)
+
+And here something that I can't explain just right now - that's interesting growth in numbers of consumed meat for all but \textcolor{Red}{Bryanskaya oblast'}. People there are too poor for buy more meat? Don't know, but maybe meat and its subproducts just became cheapier so there is growth for some subjects.
+
+# Metric #8: Overall area of living space
+
+```{r figure8, message=FALSE, warning=FALSE, include=FALSE}
+# 8 - 3.25. ОБЩАЯ ПЛОЩАДЬ ЖИЛЫХ ПОМЕЩЕНИЙ, ПРИХОДЯЩАЯСЯ В СРЕДНЕМ НА ОДНОГО ЖИТЕЛЯ (на конец года; квадратных метров)
+df <- readxl::read_xlsx("table/Раздел 3- Уровень жизни населения .xlsx", sheet = "3.25.", skip = 5, n_max = 98)
+names(df)[1] <- "Region"
+
+fig <- plot_ly(df,
+        x = ~c(2000:2018),
+        y = ~as.numeric(df[df$Region == "Российская Федерация",-1]),
+        type = "scatter", mode = "lines", name = "RUSSIA", line = list(dash = "solid")) %>% 
+        layout(title = "Overall area of living space",
+               xaxis = list(title = "Year"),
+               yaxis = list (title = "Square meters per capita"))
+fig <- fig %>% 
+  add_trace(y = ~as.numeric(df[df$Region == "г. Москва",-1]), 
+            name = "Moscow", line = list(dash = "dot"))
+fig <- fig %>% 
+  add_trace(y = ~as.numeric(df[df$Region == "г. Санкт-Петербург",-1]), 
+            name = "St.Petersburg", line = list(dash = "dash"))
+fig <- fig %>% 
+  add_trace(y = ~as.numeric(df[df$Region == "Брянская область",-1]), 
+            name = "Bryanskaya oblast'", line = list(dash = "longdash"))
+fig <- fig %>% 
+  add_trace(y = ~as.numeric(df[df$Region == "Приморский край",-1]), 
+            name = "Prymorskiy kray", line = list(dash = "dashdot"))
+fig <- fig %>% layout(legend = list(x = 0.1, y = 0.9))
+orca(fig, "fig8.png")
+```
+
+![](fig8.png)
+
+I still thinks that in that case growth for \textcolor{Red}{Bryanskaya oblast'} and \textcolor{Violet}{Primorskiy kray} happens just because more people moving to capitals and growth for capitals is slower because more people arrive that new living spaces build.
+
+# Metric #9: Relative worth of households spends on utility services
+
+```{r figure9, message=FALSE, warning=FALSE, include=FALSE}
+# 9 - 3.28.1 УДЕЛЬНЫЙ ВЕС РАСХОДОВ ДОМАШНИХ ХОЗЯЙСТВ НА ОПЛАТУ ЖИЛИЩНО-КОММУНАЛЬНЫХ УСЛУГ (В процентах от общей суммы потребительских расходов)
+df <- readxl::read_xlsx("table/Раздел 3- Уровень жизни населения .xlsx", sheet = "3.28.1.", skip = 6, n_max = 98)
+names(df)[1] <- "Region"
+
+fig <- plot_ly(df,
+        x = ~c(2000:2018),
+        y = ~as.numeric(df[df$Region == "Российская Федерация",-1]),
+        type = "scatter", mode = "lines", name = "RUSSIA", line = list(dash = "solid")) %>% 
+        layout(title = "Relative worth of households spends on utility services",
+               xaxis = list(title = "Year"),
+               yaxis = list (title = "Percentage from overall consumers worth"))
+fig <- fig %>% 
+  add_trace(y = ~as.numeric(df[df$Region == "г. Москва",-1]), 
+            name = "Moscow", line = list(dash = "dot"))
+fig <- fig %>% 
+  add_trace(y = ~as.numeric(df[df$Region == "г. Санкт-Петербург",-1]), 
+            name = "St.Petersburg", line = list(dash = "dash"))
+fig <- fig %>% 
+  add_trace(y = ~as.numeric(df[df$Region == "Брянская область",-1]), 
+            name = "Bryanskaya oblast'", line = list(dash = "longdash"))
+fig <- fig %>% 
+  add_trace(y = ~as.numeric(df[df$Region == "Приморский край",-1]), 
+            name = "Prymorskiy kray", line = list(dash = "dashdot"))
+fig <- fig %>% layout(legend = list(x = 0.8, y = 0.1))
+orca(fig, "fig9.png")
+```
+
+![](fig9.png)
+
+There too is growth in all subjects and I can't explain why there is need to pay more money for the same services? Only can suppose that living standarts growing too so people consume more electricity and water and tend to move to the new places with higher costs of utility services.
+
+# Metric #10: Income
+
+```{r figure10, message=FALSE, warning=FALSE, include=FALSE}
+# 10 - 3.2. СРЕДНЕДУШЕВЫЕ ДЕНЕЖНЫЕ ДОХОДЫ НАСЕЛЕНИЯ
+df <- readxl::read_xlsx("table/Раздел 3- Уровень жизни населения .xlsx", sheet = "3.2.", skip = 5, n_max = 98)
+names(df)[1] <- "Region"
+
+fig <- plot_ly(df,
+        x = ~c(2000:2018),
+        y = ~as.numeric(df[df$Region == "Российская Федерация",-1]),
+        type = "scatter", mode = "lines", name = "RUSSIA", line = list(dash = "solid")) %>% 
+        layout(title = "Income",
+               xaxis = list(title = "Year"),
+               yaxis = list (title = "Income per capita"))
+fig <- fig %>% 
+  add_trace(y = ~as.numeric(df[df$Region == "г. Москва",-1]), 
+            name = "Moscow", line = list(dash = "dot"))
+fig <- fig %>% 
+  add_trace(y = ~as.numeric(df[df$Region == "г. Санкт-Петербург",-1]), 
+            name = "St.Petersburg", line = list(dash = "dash"))
+fig <- fig %>% 
+  add_trace(y = ~as.numeric(df[df$Region == "Брянская область",-1]), 
+            name = "Bryanskaya oblast'", line = list(dash = "longdash"))
+fig <- fig %>% 
+  add_trace(y = ~as.numeric(df[df$Region == "Приморский край",-1]), 
+            name = "Prymorskiy kray", line = list(dash = "dashdot"))
+fig <- fig %>% layout(legend = list(x = 0.1, y = 0.9))
+orca(fig, "fig10.png")
+```
+
+![](fig10.png)
+
+Finally, last but not the least - income. Here again \textcolor{Orange}{Moscow} have much higher growth than other regions, on the second place with much flatter curve is \textcolor{Green}{St.Petersburg} and then regions with or below overall country line. There is no need to explain growth (just denomination and hyperinflations) and difference between Moscow, St.Petersburg and regions.
+
+```{r deleting, message=FALSE, warning=FALSE, include=FALSE}
+file.remove("book19.rar"); file.remove("table/Раздел 3- Уровень жизни населения .xlsx"); file.remove("table"); rm(df)
+```
+
+Thank you for the attention!
