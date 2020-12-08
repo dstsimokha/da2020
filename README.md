@@ -4,6 +4,8 @@
 
 [link to the GitHub Page](http://mglotov.me/da2020/)
 
+  - (*new!*) **ht5**: hometask #5 on DA basics! [project](basics/ht5.html) 
+
   - **lg_rg**: directory for *logistic regression* [project](lg_rg/project.html) 
 
   - **cl_an**: directory for *cluster analysis* [project](cl_an/project.html) 

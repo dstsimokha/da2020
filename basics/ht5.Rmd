@@ -1,0 +1,193 @@
+---
+title: "ht5"
+author: "Dmitriy Tsimokha"
+date: "07.12.20"
+output:
+  rmdformats::downcute:
+    code_folding: show
+    self_contained: true
+    thumbnails: false
+    lightbox: true
+---
+
+<style type="text/css">
+  body{
+  font-size: 14pt;
+}
+</style>
+
+**Turn the dark theme if you are reading it at night! (button with sun at the left)**
+
+```{r data_loading, message=FALSE, warning=FALSE}
+library(foreign); library(knitr); library(ggplot2); library(kableExtra)
+library(jtools); library(memisc); library(sjPlot); library(ggstance)
+library(broom.mixed); library(stargazer); library(ggthemr)
+df <- read.spss("dataht5.sav", use.value.labels = T, to.data.frame = T)
+df <- na.omit(df[c("happy", "gndr", "inwyys", "yrbrn", "sclmeet")])
+```
+
+# 1. Visualizing distributions
+```{r settings_viz, include=FALSE}
+#devtools::install_github('Mikata-Project/ggthemr')
+# https://github.com/Mikata-Project/ggthemr
+# https://github.com/ricardo-bion/ggtech
+# https://github.com/hrbrmstr/hrbrthemes
+ggthemr("flat dark", type = "outer")
+# For transparent plots:
+# theme_update(panel.background = element_rect(fill = "transparent",
+#                                              colour = NA),
+#              plot.background = element_rect(fill = "transparent",
+#                                             colour = NA))
+#opts_chunk$set(dev.args=list(bg="transparent"))
+```
+
+[Really nice graphing guide!](https://cedricscherer.netlify.app/2019/08/05/a-ggplot2-tutorial-for-beautiful-plotting-in-r/)
+
+[Even nicer amount of themes for plotting!](https://rfortherestofus.com/2019/08/themes-to-improve-your-ggplot-figures/)
+
+*I just can't stop choosing between different themes, help*
+
+## Happy (dependent variable)
+```{r happy_viz}
+g <- ggplot(df, aes(x = happy))
+g + geom_bar(stat = 'count') + 
+  labs(x = "Level of happiness", y = "Count")
+```
+
+**Level of happiness** looks like skewed to the right distribution, but can be considered as quite close to normal distribution.
+
+## Gender
+```{r gender_viz}
+g <- ggplot(df, aes(x = gndr))
+g + geom_bar(stat = 'count') + 
+  labs(x = "Gender", y = "Count")
+```
+
+There are **more female** respondents than male ones - nearly on one fourth larger sample.
+
+## Age
+```{r age_viz}
+df$age <- as.numeric(levels(df$inwyys))[df$inwyys] - as.numeric(levels(df$yrbrn))[df$yrbrn]
+ggplot(df, aes(x = age)) + 
+  geom_density(fill = "salmon", stat = 'density') + 
+  stat_function(fun = dnorm, args = list(mean = mean(df$age), sd = sd(df$age))) +
+  labs(x = "Age", y = "Density")
+```
+
+Distrubution of **age** have two peakes at ~30 and at ~60 but still can be considered as close to equal (if we really want to).
+
+## Meeting with friends and colleagues frequency
+```{r meeting_viz}
+ggplot(df, aes(x = sclmeet)) + 
+  geom_bar(stat = 'count') + 
+  labs(x = "Frequency of meeting", y = "Count")
+```
+
+Too can be considered as normal distribution (*if look from far distance*).
+
+
+# 2. Simple model with control variables (age & gender)
+
+[Great visualization tool for regression!](https://cran.r-project.org/web/packages/jtools/vignettes/summ.html)
+
+```{r message=FALSE, warning=FALSE}
+model1 <- lm(data = df, as.numeric(happy) ~ age + gndr)
+tab_model(model1)
+```
+
+And **gender** is not significant! It can be seen not only by p-value larger than 0.05, but also that confident interval includes **0**.
+
+Even though **age** is significant it still causes very small effect at first glance - but if we consider that age don't start from 0 and difference can be 50 or more years difference in effect can be really large (per -0.02 for each year).
+
+*Looks like the older we get the less happier we feel :(*
+
+
+# 3. More complex model with meeting frequency
+
+```{r message=FALSE, warning=FALSE}
+model2 <- lm(data = df, as.numeric(happy) ~ age + gndr + sclmeet)
+# https://strengejacke.github.io/sjPlot/articles/tab_model_estimates.html
+tab_model(model2)
+```
+
+The second model is more complex and include **frequency of meeting** with friends and colleagues:
+- **gender** again is not significant! 
+- **frequency of meeting** is significant and have **strong positive** effect on level of happiness! 
+
+```{r results="asis", message=FALSE, warning=FALSE}
+stargazer(anova(model1, model2), type = "html", title="ANoVA", intercept.bottom = FALSE,
+          single.row = TRUE, align=TRUE, ci=TRUE, ci.level=0.95, no.space=TRUE)
+```
+
+The **model2** with **frequency of meeting** is significantly better than *model1*: lower RSS shows that.
+
+
+```{r message=FALSE, warning=FALSE}
+tab_model(model1, model2)
+```
+
+Still, each model describes only up to 0.04 variance max at the best case and that's too bad! 
+
+# 4. Interpretation
+
+## Assumptions
+```{r}
+plot_model(model2, type = "diag")[[1]]
+```
+
+We don't have any multicollinearity!
+
+```{r message=FALSE, warning=FALSE}
+plot_model(model2, type = "diag")[[2]]
+```
+
+And even residuals distributed normally and there are no major outliers!
+
+```{r}
+plot_model(model2, type = "diag")[[3]]
+```
+
+Here again - residuals at the best shape and very nicely fits under the normal distribution line.
+
+```{r message=FALSE, warning=FALSE}
+plot_model(model2, type = "diag")[[4]]
+```
+
+And here the baddest picture - homoscedasticity. Looks as bad as \[R^2\] of our models.
+
+# 5. Visualization of the better model
+
+*shine bright!*
+
+```{r message=FALSE, warning=FALSE}
+plot_summs(model2, plot.distributions = TRUE, inner_ci_level = .9)
+```
+
+Again, here can be seen coefficients with confidence intervals of the best (second) model:
+- **age** is nearly on the line
+- **gender** crosses the line with it's confidence interval
+- and for different levels of **meeting frequency** everything great!
+
+## Effects
+
+```{r}
+plot_model(model2, type = "pred")[[1]]
+```
+
+**Age** has significant negative effect and with greater age level of happiness expected to lower.
+
+```{r}
+plot_model(model2, type = "pred")[[2]]
+```
+
+**Gender** is not significant so that picture can be scipped.
+
+```{r}
+plot_model(model2, type = "pred")[[3]]
+```
+
+And **level of happiness** significantly affected by **meeting frequency** with positive direction!
+
+# Summary
+
+It does not matter what gender are you - just spend time with your friends more while you are young and **be happy**!
