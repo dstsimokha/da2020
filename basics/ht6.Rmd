@@ -1,0 +1,288 @@
+---
+title: "ht6"
+author: "Dmitriy Tsimokha"
+date: "13.12.20"
+link: (click)[http://mglotov.me/da2020/basics/ht6.html]
+output:
+  rmdformats::downcute:
+    code_folding: show
+    self_contained: true
+    thumbnails: false
+    lightbox: true
+---
+
+<div class="snowflakes" aria-hidden="true">
+  <div class="snowflake">
+  ❅
+  </div>
+  <div class="snowflake">
+  ❅
+  </div>
+  <div class="snowflake">
+  ❆
+  </div>
+  <div class="snowflake">
+  ❄
+  </div>
+  <div class="snowflake">
+  ❅
+  </div>
+  <div class="snowflake">
+  ❆
+  </div>
+  <div class="snowflake">
+  ❄
+  </div>
+  <div class="snowflake">
+  ❅
+  </div>
+  <div class="snowflake">
+  ❆
+  </div>
+  <div class="snowflake">
+  ❄
+  </div>
+</div>
+
+
+```{css echo = FALSE}
+body {
+  font-size: 14pt;
+}
+/*Source: https://codepen.io/codeconvey/pen/xRzQay*/
+/* customizable snowflake styling */
+.snowflake {
+  color: lightblue;
+  font-size: 5em;
+  font-family: Arial;
+  text-shadow: 0 0 1px #000;
+}
+@-webkit-keyframes snowflakes-fall{0%{top:-10%}100%{top:100%}}
+@-webkit-keyframes snowflakes-shake{
+    0%{-webkit-transform:translateX(0px);transform:translateX(0px)}
+   50%{-webkit-transform:translateX(80px);transform:translateX(80px)}
+  100%{-webkit-transform:translateX(0px);transform:translateX(0px)}}
+@keyframes snowflakes-fall{
+    0%{top:-10%}
+  100%{top:100%}}
+@keyframes snowflakes-shake{
+    0%{transform:translateX(0px)}
+   50%{transform:translateX(80px)}
+  100%{transform:translateX(0px)}}
+.snowflake{
+  position:fixed;
+  top:-10%;
+  z-index:9999;
+  -webkit-user-select:none;
+  -moz-user-select:none;
+  -ms-user-select:none;
+  user-select:none;
+  cursor:default;
+  -webkit-animation-name:snowflakes-fall,snowflakes-shake;
+  -webkit-animation-duration:10s,3s;
+  -webkit-animation-timing-function:linear,ease-in-out;
+  -webkit-animation-iteration-count:infinite,infinite;
+  -webkit-animation-play-state:running,running;
+  animation-name:snowflakes-fall,snowflakes-shake;
+  animation-duration:10s,3s;
+  animation-timing-function:linear,ease-in-out;
+  animation-iteration-count:infinite,infinite;
+  animation-play-state:running,running}
+.snowflake:nth-of-type(0){left: 1%;-webkit-animation-delay:  0s,  0s;animation-delay:  0s,  0s}
+.snowflake:nth-of-type(1){left:10%;-webkit-animation-delay:  1s,  1s;animation-delay:  1s,  1s}
+.snowflake:nth-of-type(2){left:20%;-webkit-animation-delay:  6s,0.5s;animation-delay:  6s,0.5s}
+.snowflake:nth-of-type(3){left:30%;-webkit-animation-delay:  4s,  2s;animation-delay:  4s,  2s}
+.snowflake:nth-of-type(4){left:40%;-webkit-animation-delay:  2s,  2s;animation-delay:  2s,  2s}
+.snowflake:nth-of-type(5){left:50%;-webkit-animation-delay:  8s,  3s;animation-delay:  8s,  3s}
+.snowflake:nth-of-type(6){left:60%;-webkit-animation-delay:  6s,  2s;animation-delay:  6s,  2s}
+.snowflake:nth-of-type(7){left:70%;-webkit-animation-delay:2.5s,  1s;animation-delay:2.5s,  1s}
+.snowflake:nth-of-type(8){left:80%;-webkit-animation-delay:  1s,  0s;animation-delay:  1s,  0s}
+.snowflake:nth-of-type(9){left:90%;-webkit-animation-delay:  3s,1.5s;animation-delay:  3s,1.5s}
+```
+
+
+I've chosen **Switzerland** on **9th** round - just because someday I want to live there (*among mountains and forests!*)
+
+```{r data_loading, message=FALSE, warning=FALSE}
+library(ggthemr); library(foreign); library(ggplot2); library(stringr); 
+library(sjPlot); library(stargazer); library(jtools)
+ggthemr("lilac", type = "outer")
+df <- read.spss("ESS9CH.sav", use.value.labels = T, to.data.frame = T)
+df <- na.omit(df[c("plnftr", "trstlgl", "agea", "rshpsts", "bthcld", "gndr")])
+df <- na.omit(df)
+```
+
+
+# Variables & model
+
+**My hypothesis**: person's attitude towards *planning for future or taking each day as it comes* relates on how stable are situation in country with legal system which can be evaluates through person's *trust in the legal system* attitude - **more trust person have to legal system, more she/he perceive situation in country as stable therefore more planning for future**.
+
+Such relation assumed to have different effect strength with people of different age and on people with/without partners and children: (*I understand that hypotheses for control variables are not used usially, but why not*)   
+- **age**: simple case - more years, more planning; complex case - more years (till 50s), more planning & more years (after 50s), less planning    
+- **partner**: if there are any partner now, assumed that person plan more    
+- **children**: if there are any child(ren), assumed that person plan more    
+
+
+# Variables
+
+- **Dependent**: plnftr: Plan for future or take each day as it comes   
+- **Predictor**: trstlgl: Trust in the legal system   
+- *Control*: agea: Age of respondent, calculated    
+- *Control*: rshpsts: Relationship with husband/wife/partner currently living with    
+- *Control*: bthcld: Ever given birth to/ fathered a child    
+
+
+## Variables distributions: plnftr
+
+```{r}
+ggplot(df, aes(x = plnftr)) + geom_bar(stat = "count") +
+  labs(x = "Plan for future or take each day as it comes", y = "Count") + 
+  scale_x_discrete(labels = function(x) str_wrap(x, width = 15))
+```
+
+So dependent variable distributed not really equally but nevertheless - I will analyse it.
+
+## Variables distributions: trstlgl
+
+```{r}
+ggplot(df, aes(x = trstlgl)) + geom_bar(stat = "count") +
+  labs(x = "Trust in the legal system", y = "Count")
+```
+
+There are strong skew to the right on the trust in the legal system for Switzerland - *that's good for them* (**but not good for the model**)!
+
+## Variables distributions: agea
+
+```{r}
+ggplot(df, aes(x = as.numeric(agea))) + 
+  geom_density(fill = "salmon", stat = 'density') + 
+  stat_function(fun = dnorm, args = list(mean = mean(as.numeric(df$agea)), sd = sd(as.numeric(df$agea)))) +
+  labs(x = "Age", y = "Density")
+```
+
+Age distributed normally as always in ESS (*good job*).
+
+## Variables distributions: rshpsts
+
+```{r}
+ggplot(df, aes(x = rshpsts)) + geom_bar(stat = "count") +
+  scale_x_discrete(labels = function(x) str_wrap(x, width = 15)) +
+  labs(x = "Relationship with husband/wife/partner currently living with", y = "Count")
+```
+
+And here will be a lot of problems with such distribution. So let's take **gender as other control** variable instead this one.
+
+## Variables distributions: gndr
+
+```{r}
+ggplot(df, aes(x = gndr)) + geom_bar(stat = "count") +
+  labs(x = "Gender", y = "Count")
+```
+
+Very nice (almost uniform) distribution.
+
+## Variables distributions: bthcld
+
+```{r}
+ggplot(df, aes(x = bthcld)) + geom_bar(stat = "count") +
+  labs(x = "Ever given birth to/ fathered a child", y = "Count")
+```
+
+Not really nice distribution but okay.
+
+
+# Models
+
+*Remember! I don't revert the scale of planning for future - zero is more planning attitude!*
+
+## Comparison
+
+```{r}
+model1 <- lm(data = df, as.numeric(plnftr) ~ as.numeric(agea) + gndr + bthcld)
+model2 <- lm(data = df, as.numeric(plnftr) ~ as.numeric(trstlgl))
+# Main model
+model <- lm(data = df, as.numeric(plnftr) ~ as.numeric(trstlgl) + as.numeric(agea) + gndr + bthcld)
+tab_model(model, model1, model2, title = "Models comparison", dv.labels = c("predictor & control", "Only control", "Only predictor"))
+```
+
+As can be seen main difference here is between model with only control variables and model with control variables and key predictor - latter is slightly better than model with only control variables so it can be assumed that usage of key predictor, trust in legal system, is justified.
+
+
+```{r results="asis", message=FALSE, warning=FALSE}
+stargazer(anova(model, model1), type = "html", title="ANoVA", intercept.bottom = FALSE,
+          single.row = TRUE, align=TRUE, ci=TRUE, ci.level=0.95, no.space=TRUE)
+```
+
+## Main model
+
+```{r}
+tab_model(model, title = "Main model", dv.labels = c("predictor & control"))
+```
+
+**Interpretation**:   
+- *trust in the legal system* significantly leads to more planning attitude (more trust, more planning)!    
+- *age* too have significant effect, but against my hypothesis ()   
+- *gender*: have significant effect - females less plan for future than males.    
+- *child(ren)*: not significant.    
+
+# Assumptions
+
+```{r}
+plot_model(model, type = "diag")[[1]]
+```
+
+We don't have any multicollinearity!
+
+```{r message=FALSE, warning=FALSE}
+plot_model(model, type = "diag")[[2]]
+```
+
+And even residuals distributed normally and there are no major outliers!
+
+```{r}
+plot_model(model, type = "diag")[[3]]
+```
+
+Here again - residuals at the best shape and very nicely fits under the normal distribution line.
+
+```{r message=FALSE, warning=FALSE}
+plot_model(model, type = "diag")[[4]]
+```
+
+Again - homoscedasticity just not for my models :(
+
+## Viz
+
+```{r message=FALSE, warning=FALSE}
+plot_summs(model, plot.distributions = TRUE, inner_ci_level = .9)
+```
+
+Plot shows all that already was described in Interpretation.
+
+
+## Effects
+
+```{r}
+plot_model(model, type = "pred")[[1]]
+```
+
+**Trust in the legal system** has significant negative effect and with greater trust people plan more (or with greater trust people less 'take each day as it comes')
+
+```{r}
+plot_model(model, type = "pred")[[2]]
+```
+
+**Age** have significant effect and with more years being on Earth people tend to plan less and more 'take each day as it comes' - *some wisdom is hidden here*
+
+
+```{r}
+plot_model(model, type = "pred")[[3]]
+```
+
+And **gender** - females more 'take each day as it comes' than males! (that's interesting)
+
+
+# Summary
+
+I came to the conclusion that it is really interesting topic to research - what influences on peoples attitudes to 'planning for future' or to 'take each day as it comes'. I suppose that it is highly connected with perceived stability in the society besides self-efficacy and some minor factors.
+

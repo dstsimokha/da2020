@@ -1,0 +1,384 @@
+---
+title: "practices"
+author: "Dmitriy Tsimokha"
+date: "11/21/2020"
+output: html_document
+---
+
+```{r, message=FALSE, warning=FALSE}
+library(foreign)
+df <- read.spss("ESS8RU.sav", use.value.labels = T, to.data.frame = T)
+```
+
+# Hypothesis testing
+**H0** - нулевая гипотеза: все равны, все одинаково, нет связи.
+
+**H1** - альтернативная гипотеза: что-то отличается, есть связь.
+
+## Errors
+Ошибка **первого** рода (**false positive**, alpha-error) состоит в том, что будет *отвергнута правильная* гипотеза.
+
+Ошибка **второго** рода (**false negative**, beta-error) состоит в том, что будет *принята неправильная* гипотеза.
+
+## P-value
+It is a probability of **false positive error** - that true H0 will be rejected.
+
+In sociology significance level is 0.05 - so probability to get false positive error no more than 5%.
+
+## Test matrix
+
++----------------+--------------------+--------------------+------------------------+
+|                | binary             | nominal / ordinal  | interval / relational  |
++================+====================+====================+========================+
+| **binary**     | chi-square with    | chi-square         | t-test /               |
+|                | Yaets's correction |                    | Wilcoxon test          |
+|                |                    |                    | (Mann-Whitney)         |
++----------------+--------------------+--------------------+------------------------+
+| **nominal** /  | chi-square         | chi-square         | ANoVA /                |
+| **ordinal**    |                    |                    | Kruskal-Wallis         |
++----------------+--------------------+--------------------+------------------------+
+| **interval** / | t-test /           | ANoVA /            |                        |
+| **relational** | Wilcoxon test      | Kruskal-Wallis     | Correlation            |
+|                | (Mann-Whitney)     |                    |                        |
++----------------+--------------------+--------------------+------------------------+
+
+
+# Binomial test
+Checks for difference in observed and expected distributions.
+
+Checks hypothesis of binomial distribution parameter.
+```{r}
+# H0: p = p0
+binom.test(15, 100, 0.33)
+```
+
+
+# Chi-square
+Compare expected and real frequencies of two categorical variables using confluence matrix.
+
+## Assumptions
+
+- observations are independent
+- no more than 20% of cells have values lower than 5
+- expected values in all cells greater than 1
+
+### For 2x2 table
+- All expected frequencies must be greater than 10
+- If some expected frequencies are lower than 10 but greater than 5 - Yaets's correction for continuinity can be used
+
+## Workflow
+- *Difference between observed and expected frequencies* called **residuals**.
+- Find number of *degree of freedom* **df = (n_Rows – 1) × (n_Columns – 1)**.
+- *Compare value of χ^2 criterion with critical value with number degree of freedom f* by the table.
+
+```{r}
+# Show critical value of chi-square test for chosen p-value and degrees of freedom
+qchisq(p = 0.95, df = 1)
+```
+
+```{r}
+mytable <- matrix(c(1272, 797, 781, 693, 461, 894, 748, 731, 433, 392, 136, 169, 117, 169, 87, 176, 163, 146, 151, 126), ncol = 2)
+row.names(mytable) <- c("Valeriy_Meladze", "Max_Korzh", "Bi_2", "Monetochka", "Skriptonit", "Little_Big", "Oxxxymiron", "Zemfira", "LSP", "Tima_Beloruskih")
+colnames(mytable) <- c("student_votes", "liceist_votes")
+
+chisq.test(mytable)
+
+mychisq <- chisq.test(mytable)
+# mychisq$observed
+# mychisq$expected
+# mychisq$residuals
+# mychisq$stdres
+```
+
+## Interpretation of chi-square test
+**X2 (2, N = 170) = 14.14, p <.01**
+- show x2 value
+- show significance level & value
+- show number of degrees of freedom
+- show number of observations
+
+## Visualization
+
+### Visualize distribution
+```{r}
+# Default variant
+plot(df$stfgov, df$rfgfrpc)
+library(sjPlot)
+# Show difference of distributions in groups
+plot_xtab(df$stfgov, df$rfgfrpc, show.total = FALSE)
+plot_xtab(df$stfgov, df$rfgfrpc, bar.pos = "stack", show.total = FALSE)
+plot_xtab(df$stfgov, df$rfgfrpc, margin = "row", bar.pos = "stack", show.total = FALSE)
+# More 'exotic' but useful variant
+library(vcd)
+mosaic(mytable)
+```
+
+### Visualize residuals
+```{r}
+mosaic(mychisq$observed, shade=TRUE, legend=TRUE)
+library(corrplot)
+corrplot(mychisq$residuals, is.cor=FALSE)
+corrplot(mychisq$residuals, is.cor=FALSE, method="square")
+```
+## Interpretation of residuals
+
+If x^2 value greater than critical value from the table (p-value < 0.05) then need to know which cells cause such effect - look for **standardized residuals**: 
+- *if value > 2 - in a cell more observations that expected*
+- *if value < -2 - in a cell less observations that expected*
+
+(that expected in the case of variables don't have any relation)
+
+
+# T-test (parametric)
+Helps to establish relationship between one continuous and one binary variables.
+
+There are three kind of t-tests:
+- **One-sample t-test**: compare sample observed mean with theoretical mean (*H0: μ0=μ1*)
+- **Independent (unpaired) samples t-test**: compare observed means of two samples (*H0: μ1=μ2*)
+- **Paired samples t-test**: compare means of paired parameters (H0: μ1−μ2=0)
+
+## Assumptions
+- check for normality of distribution (*both visually and by tests*)
+- for unpaired samples: check for variance equality for groups
+
+### Check for normality of distribution
+```{r}
+# For both tests - H0: no difference between observed and normal distributions
+# Kolmogorov-Smirnov: rarely used in practice
+ks.test(as.numeric(df$agea)[df$gndr == "Male"], "pnorm")
+ks.test(as.numeric(df$agea)[df$gndr == "Female"], "pnorm")
+# Shapiro-Wilk:
+shapiro.test(as.numeric(df$agea)[df$gndr == "Male"])
+shapiro.test(as.numeric(df$agea)[df$gndr == "Female"])
+```
+
+```{r}
+qqnorm(as.numeric(df$agea)[df$gndr == "Male"])
+qqline(as.numeric(df$agea)[df$gndr == "Male"], col= 2)
+# If dots on diagonal red line - distribution is like normal
+hist(as.numeric(df$agea)[df$gndr == "Male"])
+hist(as.numeric(df$agea)[df$gndr == "Female"])
+```
+
+### Check for variance equality
+```{r}
+# For both tests - H0: variances are equal
+bartlett.test(as.numeric(df$agea) ~ df$gndr)
+var.test(as.numeric(df$agea) ~ df$gndr)
+```
+
+## Visualization
+
+```{r}
+plot(as.numeric(df$agea) ~ df$gndr)
+```
+## Test example
+```{r}
+t.test(as.numeric(df$agea) ~ df$gndr, var.equal = T)
+# paired = T - for paired samples
+```
+
+
+## Effect size
+
+```{r}
+library(effsize)
+# Delete NAs if there any
+cohen.d(as.numeric(df$agea), df$gndr)
+# paired = T - for paired samples
+```
+
+[Cohen’s d](https://rpsychologist.com/cohend/) interpretation:
+- 0.00 < 0.20: **Negligible**
+- 0.20 < 0.50: **Small**
+- 0.50 < 0.80: **Medium**
+- 0.80 or more: **Large**
+
+## Non-parametric analogy for non-normal distributed variables
+```{r}
+# For both tests - H0: no difference between group means
+wilcox.test(as.numeric(df$agea) ~ df$gndr)
+# paired = T - for paired samples
+```
+
+### Non-perametric effect size
+```{r}
+library(rstatix)
+tmp <- df; tmp$agea <- as.numeric(tmp$agea)
+tmp %>% wilcox_effsize(agea ~ gndr)
+```
+
+
+# ANoVA: parametric test
+Helps compare means between several groups.
+
+Based on comparison of variance between and variance within groups.
+
+[Formulas](https://www.khanacademy.org/math/statistics-probability/analysis-of-variance-anova-library/analysis-of-variance-anova/v/anova-1-calculating-sst-total-sum-of-squares)
+
+H0: no difference between groups means
+
+```{r}
+# imprich - Important to be rich, have money and expensive things
+# iprspot - Important to get respect from others
+df$Power <- (as.numeric(df$imprich) + as.numeric(df$iprspot))/2
+hist(df$Power)
+```
+
+
+## Assumptions
+The same with t-test.
+
+### Check for variance equality
+```{r}
+library(car)
+# H0: variances are equal
+leveneTest(df$Power ~ df$netusoft)
+```
+
+
+## Visual investigation
+```{r}
+library(knitr)
+knitr::kable(data.frame(table(df$netusoft)))
+
+par(mfrow = c(1, 1), mar = c(12, 4, 4, 1))
+boxplot(df$Power ~ df$netusoft, las = 2)
+
+library(ggplot2)
+p1 <- ggplot(df, aes(x=Power, fill=netusoft)) + geom_density(alpha=.3) + 
+  scale_x_continuous(limits = c(-15, 15))
+p1
+```
+
+## ANoVA test example
+```{r}
+oneway.test(df$Power ~ df$netusoft, var.equal = T)
+# For equal variances:
+aov.out <- aov(df$Power ~ df$netusoft)
+summary(aov.out)
+```
+
+## Interpretation
+**F(4, 2332) = 33.657, p < 2.2e-16**
+
+## Effect size
+[eta & omega](https://strengejacke.wordpress.com/2017/07/25/effect-size-statistics-for-anova-tables-rstats/)
+```{r}
+library(sjstats)
+omega_sq(aov(df$Power ~ df$netusoft))
+eta_sq(aov(df$Power ~ df$netusoft))
+df %>% kruskal_effsize(netusoft~Power)
+```
+
+- 0.01 - 0.06 - **Small**
+- 0.06 - 0.14 - **Medium**
+- > 0.14 - **Large**
+
+### Visualization
+```{r}
+Tukey <- TukeyHSD(aov.out)
+plot(Tukey)
+par(mfrow = c(1, 1), mar = c(4, 20, 5, 1))
+plot(Tukey, las = 2, cex.axis = 0.5)
+```
+
+## Non-parametric analogy for not equal variances
+```{r}
+pairwise.t.test(df$Power, df$netusoft, adjust = "bonferroni")
+kruskal.test(df$Power ~ df$netusoft)
+```
+
+### Post-hoc
+```{r message=FALSE, warning=FALSE}
+library(FSA)
+dunnTest(df$Power, df$netusoft, method = "bonferroni")
+```
+
+
+### Visualization
+```{r message=FALSE, warning=FALSE}
+par(mfrow = c(1, 1), mar = c(3, 15, 4, 1))
+boxplot(df$Power ~ df$netusoft, las = 2, horizontal = T, ylab = "")
+# More complex plot
+library(ggridges)
+library(ggplot2)
+ggplot(df, aes(x = Power, y = netusoft)) +
+  geom_density_ridges() +
+  theme_ridges() + 
+  theme(legend.position = "none")
+# Or by boxplots
+plot_grpfrq(df$Power, df$netusoft,  type = "box")
+```
+
+
+# Correlational analysis
+
+- **Pearson**: for normal distributed variables
+- **Spearman**: for ordinal or non-normal distributed
+- **Kendall**: for ordinal or non-normal distributed
+- Polyhoric
+- Partial
+- and so on
+
+## Interpretation
+
+- 0: **Zero**
+- 0.1-0.3: **Weak/Poor**
+- 0.4-0.6: **Moderate/Fair**
+- 0.7-0.9: **Strong/Very Strong**
+- 1: **Perfect**
+
+```{r}
+par(mfrow = c(1, 2))
+hist(df$alcwkdy1)
+hist(df$alcwknd1)
+```
+
+## Check for normality
+```{r}
+shapiro.test(d2$alcwkdy1)
+```
+
+## Testing
+```{r}
+cor.test(d2$alcwkdy1, d2$alcwknd1, method = "pearson")
+cor.test(d2$alcwkdy1, d2$alcwknd1, method = "spearman")
+cor.test(d2$alcwkdy1, d2$alcwknd1, method = "kendall")
+```
+
+## Visualization
+```{r}
+plot(d2$alcwkdy1, d2$alcwknd1, pch = 20)
+```
+
+## Logarithm scales
+```{r}
+d2$alcwkdylog <- log(d2$alcwkdy1)
+d2$alcwkndlog <- log(d2$alcwknd1)
+```
+
+## Example
+```{r}
+# Values
+df$Conformity <- (as.numeric(df$ipfrule) + as.numeric(df$ipbhprp))/2
+df$Tradition <- (as.numeric(df$ipmodst) + as.numeric(df$imptrad))/2
+df$Benevolence <- (as.numeric(df$iphlppl) + as.numeric(df$iplylfr))/2
+df$Universalism <- (as.numeric(df$ipeqopt) + as.numeric(df$ipudrst) 
+                      + as.numeric(df$impenv))/3
+df$SelfDirection <- (as.numeric(df$ipcrtiv) + as.numeric(df$impfree))/2
+df$Stimulation <- (as.numeric(df$impdiff) + as.numeric(df$ipadvnt))/2
+df$Hedonism <- (as.numeric(df$ipgdtim) + as.numeric(df$impfun))/2
+df$Achievement <- (as.numeric(df$ipshabt) + as.numeric(df$ipsuces))/2
+df$Power <- (as.numeric(df$imprich) + as.numeric(df$iprspot))/2
+df$Security <- (as.numeric(df$impsafe) + as.numeric(df$ipstrgv))/2
+
+values <- data.frame(df$Conformity, df$Tradition, df$Benevolence,
+                     df$Universalism, df$SelfDirection, df$Stimulation, 
+                     df$Hedonism, df$Achievement, df$Power, df$Security)
+```
+
+```{r}
+tab_corr(values, corr.method = "kendall")
+```
+

@@ -1,0 +1,239 @@
+---
+title: "ht4"
+author: "Dmitriy Tsimokha"
+date: "23.11.20"
+output:
+  rmdformats::downcute:
+    code_folding: show
+    self_contained: true
+    thumbnails: false
+    lightbox: true
+---
+
+```{r data_loading, message=FALSE, warning=FALSE, include=FALSE}
+library(foreign); library(dplyr); library(sjPlot); library(vcd); library(corrplot); library(car); library(sjstats); library(rstatix); library(FSA)
+df <- read.spss("ESS8RU.sav", use.value.labels = T, to.data.frame = T)
+```
+
+
+# Task 1
+
+```{r task1_distr}
+par(mfrow = c(1, 3), pin = c(2.2, 2.5))
+barplot(table(df$happy), main = "happy")
+barplot(table(df$stflife), main = "subjective wellbeing")
+barplot(table(df$health), main = "subjective health")
+```
+
+Distributions look near normal with slight skeweness to the right for **happy** and **subjective wellbeing** distributions and with slight skeweness to the left for **subjective health**.
+
+Also for both for **happiness** and **subjective wellbeing** scales starts with lower/more negative values but for **subjective health** situation is opposite - it is better to reverse the scale for further analysis.
+```{r task1_transform}
+df$health <- factor(df$health, levels = rev(levels(df$health)))
+```
+
+## Testing assumption for distributions normality
+
+```{r task1_assumpt}
+shapiro.test(as.numeric(df$happy))
+shapiro.test(as.numeric(df$stflife))
+shapiro.test(as.numeric(df$health))
+```
+
+For each variable Shapiro-Wilk normality test tells that distributions are likely to be close to normal one.
+
+Both by visual investigation of distributions and by Shapiro-Wilk normality test results observed distributions can be considered as quite normal ones so Pearson parametric correlation can be used.
+
+## Formal test
+
+```{r task1_test}
+tab_corr(data.frame('happy' = as.numeric(df$happy), 
+                    'stflife' = as.numeric(df$stflife), 
+                    'health' = as.numeric(df$health)), corr.method = "pearson")
+```
+
+All correlations are significant with p-value < 0.05.
+
+## Interpretation
+
+Pearson parametric correlation shows following results:   
+- **happiness** and **subjective wellbeing** have *moderate/fair* correlation with *positive* direction   
+- **happiness** and **subjective health** have *weak/poor* correlation with *positive* direction    
+- **subjective wellbeing** and **subjective health** have *weak/poor* correlation with *positive* direction   
+
+*Positive moderate* correlation between **happiness** and **subjective wellbeing** seems obvious and expected, while *positive weak/poor* correlations between **subjective health** and both **happiness** and **subjective wellbeing** is quite interesting and may indicate that for Russians concept of **subjective health** don't have strong connection with **happiness** and **subjective wellbeing**.
+
+## Visual results
+```{r message=FALSE, warning=FALSE}
+tmp <- df %>%
+  mutate(happy = as.numeric(happy), 
+         stflife = as.numeric(stflife), 
+         health = as.numeric(df$health)) %>% 
+  cor_mat(happy, stflife, health)
+par(mfrow = c(1, 1), pin = c(3, 2.5))
+corrplot(as.matrix(tmp[1:3,2:4]), is.corr=T, method="square", diag=F)
+```
+
+
+# Task 2
+
+For me it is obvious that chi-square test should be used, but from the condition to use both parametric and non-parametric tests my understanding becomes questionable - so I decides to use firstly chi-square test and treat both variables as factors, then use ANoVA and non-parametric analogies.
+
+## Chi-square test
+
+```{r task2_distr}
+mytable <- table(df$rfgfrpc, df$stfgov)
+plot_xtab(df$stfgov, df$rfgfrpc, margin = "row", bar.pos = "stack", show.total = FALSE)
+```
+
+Looks like that people who take any polar position (extremely dissatisfied / satisfied) on the government satisfaction question tend to be more concrete on the refugee question - both polar groups have less neutral answers percentage.
+
+Seems that uncertain people tend to be uncertain in any question :)
+
+```{r task2_df}
+# Degrees of freedom
+(nrow(mytable)-1) * (ncol(mytable)-1)
+# Critical value with p-value = 0.05
+qchisq(p = 0.95, df = 40)
+```
+
+With given degrees of freedom = 40 critical value of chi-square test to be passed for rejecting H0 is 55.758.
+
+```{r task2_test_param}
+(mychisq <- chisq.test(mytable))
+```
+
+### Interpretation
+**X2 (40, N = 2430) = 89.794, p = 1.088e-05**
+
+And chi-square test results are significant and can be further interpreted.
+
+### Visual results
+
+```{r}
+corrplot(mychisq$residuals, is.cor=FALSE, method="square")
+```
+
+### Interpretation of residuals
+
+Visual investigation of test's standardized residuals confirms stated hypothesis that people from polar groups on either government or refugee questions tend to not have neutral position on both questions - **extremely dissatisfied** with government group of people observed more frequently that is expected to take either **agree strongly** of **disagree strongly** positions on refugee question.
+
+
+## ANoVA (parametric)
+
+```{r}
+boxplot(as.numeric(df$stfgov) ~ df$rfgfrpc, las = 2)
+```
+
+Treating **satisfaction in government** as numeric variable and plotting such a boxplot helps stated previously hypothesis that people on the polar groups on the **refugee question** have more variability on the **satisfaction in government** - people on polar group on one question tend to be on polar group on the other question.
+
+Some kind of *extreme* people those Russians.
+
+
+### Assumptions
+
+#### Variance equality
+
+```{r}
+# H0: variances are equal
+leveneTest(as.numeric(df$stfgov) ~ df$rfgfrpc)
+```
+
+Variances are unequal so it's better to use non-parametric test but anyway firstly I will use ANoVA.
+
+```{r}
+aov.out <- aov(as.numeric(df$stfgov) ~ df$rfgfrpc)
+summary(aov.out)
+```
+
+### Interpretation
+**F(4, 2052) = 10.64, p = 1.55e-08**
+
+ANoVA shows significant results and let's look for effect size
+
+```{r}
+omega_sq(aov(as.numeric(df$stfgov) ~ df$rfgfrpc))
+eta_sq(aov(as.numeric(df$stfgov) ~ df$rfgfrpc))
+df %>% kruskal_effsize(df$rfgfrpc ~ as.numeric(df$stfgov))
+```
+
+And the effect size is quite **small** and by test or by visual investigation nothing interesting besides *polar people* can not found.
+
+
+## Non-parametric analogies
+
+```{r message=FALSE, warning=FALSE}
+pairwise.t.test(as.numeric(df$stfgov), df$rfgfrpc, adjust = "bonferroni")
+kruskal.test(as.numeric(df$stfgov) ~ df$rfgfrpc)
+dunnTest(as.numeric(df$stfgov), df$rfgfrpc, method = "bonferroni")
+```
+
+
+
+# Task 3
+
+Grouping conditions seems not really clear to me - are those conditions strict and other groups (like those who not finished even middle school) need to be removed or such groups should be included in upper group ('not finished middle school' as part of 'finished middle school' group)?
+
+Anyway I decided to take conditions as strict ones and do exactly as written.
+
+```{r task3_mutate}
+df <- df %>% mutate(edu_group = factor(
+  case_when(
+    edlvdru == levels(df$edlvdru)[4] ~ "school",
+    edlvdru == levels(df$edlvdru)[7] ~ "special",
+    edlvdru %in% levels(df$edlvdru)[8:11] ~ "higher",
+), levels = c("school", "special", "higher"), ordered = T))
+```
+
+## Assumptions
+
+```{r}
+# Shapiro-Wilk:
+shapiro.test(as.numeric(df$rlgdgr)[df$edu_group == "school"])
+shapiro.test(as.numeric(df$rlgdgr)[df$edu_group == "special"])
+shapiro.test(as.numeric(df$rlgdgr)[df$edu_group == "higher"])
+```
+
+All three groups are **distributed normally** as it's can be interpreted from the Shapiro-Wilk test results.
+
+```{r}
+bartlett.test(as.numeric(df$rlgdgr) ~ df$edu_group)
+```
+
+But **variances are far from being equal** - there will be problems with parametric tests!
+
+
+## Parametric test
+
+```{r task3_test_param}
+mytable <- table(df$edu_group, df$rlgdgr)
+(mychisq <- chisq.test(mytable))
+corrplot(mychisq$residuals, is.cor=FALSE, method="square")
+```
+
+Interesting - chi-square test is not significant, so any post-hoc analysis can't be done (but still mosaic plot is too nice to not plot it).
+
+Let's try ANoVA:
+
+```{r}
+aov.out <- aov(as.numeric(df$rlgdgr) ~ df$edu_group)
+summary(aov.out)
+```
+
+And even ANoVA is not significant!
+
+That's start to look interesting.
+
+
+```{r task3_test_nonparam, message=FALSE, warning=FALSE}
+pairwise.t.test(as.numeric(df$rlgdgr), df$edu_group, adjust = "bonferroni")
+kruskal.test(as.numeric(df$rlgdgr) ~ df$edu_group)
+library(FSA)
+dunnTest(as.numeric(df$rlgdgr), df$edu_group, method = "bonferroni")
+```
+
+Still there are no valid analysis can be done even using non-parametric tests - only for 'higher-school' group comparison is can be valid, but that's all.
+
+
+Thank you for your attention!
+
