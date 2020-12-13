@@ -1,14 +1,16 @@
 ---
-title: "ht6"
-author: "Dmitriy Tsimokha"
+title: "hometask #6"
+author: 
+  name: "Dmitriy Tsimokha"
+  email: mglotov.me/da2020
 date: "13.12.20"
-link: (click)[http://mglotov.me/da2020/basics/ht6.html]
 output:
   rmdformats::downcute:
     code_folding: show
     self_contained: true
     thumbnails: false
     lightbox: true
+fontsize: 14pt
 ---
 
 <div class="snowflakes" aria-hidden="true">
@@ -46,9 +48,6 @@ output:
 
 
 ```{css echo = FALSE}
-body {
-  font-size: 14pt;
-}
 /*Source: https://codepen.io/codeconvey/pen/xRzQay*/
 /* customizable snowflake styling */
 .snowflake {

@@ -4,11 +4,11 @@
 
 [link to the GitHub Page](http://mglotov.me/da2020/)
 
-  - (*new!*) **home task №6**: hometask #5 on DA basics! [report](basics/ht6.html)
+  - (*new!*) **home task №6**: on DA basics [report](basics/ht6.html)
   
-  - **home task №5**: hometask #5 on DA basics! [report](basics/ht5.html) 
+  - **hometask №5**: on DA basics [report](basics/ht5.html) 
   
-  - **home task №4**: hometask #4 on DA basics [report](basics/ht4.html) 
+  - **hometask №4**: on DA basics [report](basics/ht4.html) 
 
   - **lg_rg**: directory for *logistic regression* [report](lg_rg/project.html) 
 
