@@ -1,0 +1,164 @@
+---
+title: "Week3"
+author: "Dmitriy Tsimokha"
+date: "12/20/2020"
+output: html_document
+lang: russian
+---
+
+# Ramsey test
+
+RESET - Ramsey test
+H0: there is no missing regressors
+H1: there are missing regressors
+
+## How to:
+Define model \[\hat{wage}_i = -2.5 + 0.6school + 0.16 exper\] 
+build auxiliary regression model 
+
+
+# Informational criteria
+If RSS bigger and k - number of regressors - bigger - AIC/BIC will be lower.
+
+Akaike AIC = \[n ln(RSS/n) + 2k\]
+
+Schwartz BIC = \[n ln(RSS/n) + ln(n)k\]
+
+
+```{r include=FALSE, message=FALSE, warning=FALSE}
+library(memisc); library(lmtest); library(ggplot2); library(dplyr)
+library(foreign); library(vcd); library(devtools); library(hexbin)
+library(pander); library(sjPlot); library(knitr)
+setwd("~/Documents/github/da2020/econometrics")
+f = read.csv("flats_moscow.txt", sep = "\t", header = TRUE, dec = ".")
+
+opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)  # Document-wide options
+```
+
+В нашем наборе данных `r nrow(f)` наблюдений. Средняя цена квартиры равна `r mean(f$price)` тысяч у.е.
+
+```{r}
+glimpse(f)
+qplot(data = f, totsp, price)
+(bg <- qplot(data = f, log(totsp), log(price)))
+bg + geom_hex()
+mosaic(data = f, ~walk+brick, shade = TRUE)
+# Change columns format
+f = mutate_each(f, "factor", walk, brick, floor, code)
+glimpse(f)
+qplot(data = f, log(price))
+qplot(data = f, log(price), fill = brick)
+qplot(data = f, log(price), fill = brick, position = "dodge")
+qplot(data = f, log(price), fill = brick, geom = "density")
+(g2 = qplot(data = f, log(price), fill = brick, geom = "density", alpha = 0.5))
+g2 + facet_grid(walk~floor)
+g2 + facet_grid(~floor)
+```
+
+
+```{r}
+# Models with dummy variables
+model_0 = lm(data = f, log(price) ~ log(totsp))
+model_1 = lm(data = f, log(price) ~ log(totsp) + brick)
+# Model with interaction effect
+# Sign ':' includes only variables interaction
+model_2 = lm(data = f, log(price) ~ log(totsp) + brick + brick:log(totsp))
+summary(model_0)
+mtable(model_2)
+# Sign '*' includes both variables and their interaction
+model_2b = lm(data = f, log(price) ~ brick*log(totsp))
+mtable(model_2, model_2b)
+
+plot_model(model_2)
+```
+
+```{r results='asis'}
+pander(mtable(model_0, model_1, model_2))
+```
+
+
+```{r}
+# Predicting new data 
+nw = data.frame(totsp = c(60, 60), brick = factor(c(1, 0)))
+predict(model_2, newdata = nw)
+exp(predict(model_2, newdata = nw))  # Because results in logarithmic scale
+# Adding confidence intervals: for average flat
+predict(model_2, newdata = nw, interval = "confidence")
+exp(predict(model_2, newdata = nw, interval = "confidence"))
+# Adding prediction intervals: for any possible flat
+predict(model_2, newdata = nw, interval = "prediction")
+exp(predict(model_2, newdata = nw, interval = "prediction"))
+```
+
+
+```{r}
+# Comparing models with F-test
+waldtest(model_0, model_1)  # H0: true model_0 is rejected
+waldtest(model_1, model_2)  # H0: true model_1 is rejected
+waldtest(model_0, model_2)  # H0: true model_0 is rejected
+
+(gg0 = qplot(data = f, log(totsp), log(price)))
+gg0 + stat_smooth(method = "lm")
+gg0 + stat_smooth(method = "lm") + facet_grid(~walk)
+gg0 + aes(col = brick) + stat_smooth(method = "lm") + facet_grid(~walk)
+```
+
+
+```{r}
+# Dummy variables
+f$nonbrick = memisc::recode(f$brick, 1 <- 0, 0 <- 1)
+glimpse(f)
+model_wrong = lm(data = f, log(price) ~ log(totsp) + brick + nonbrick)
+summary(model_wrong)
+
+# Comparing models with AIC & BIC - lower is better
+mtable(model_0, model_1, model_2, 
+       summary.stats = c("sigma", "R-squared", "F", "AIC", "BIC"))
+
+# Ramsey test
+resettest(model_2)  # if p-value < 0.05 = there are missing variables
+```
+
+
+# Test 3:
+```{r}
+# 3
+21.9+150^2*0.01+2*150*-0.46
+# 4
+1259.265 + (21.9+150^2*0.01+2*150*-0.46)
+
+df <- diamonds
+# 11
+length(df)
+# 12
+summary(lm(data = df, log(price) ~ carat))
+# 13
+model <- lm(data = df, price ~ carat + y)
+summary(model)
+# 14
+summary(lm(data = df, price ~ carat))
+# 15
+model <- lm(data = df, price ~ carat)
+mtable(model, 
+       summary.stats = c("sigma", "R-squared", "F", "AIC", "BIC"))
+# 16
+model0 <- lm(data = df, price ~ carat)
+model1 <- lm(data = df, price ~ carat + depth)
+model2 <- lm(data = df, price ~ carat + depth + cut)
+mtable(model0, model1, model2, 
+       summary.stats = c("sigma", "R-squared", "F", "AIC", "BIC"))
+# 17
+model0 <- lm(data = df, price ~ carat)
+model1 <- lm(data = df, price ~ carat + depth)
+waldtest(model0, model1)  # H0: true model_0 is rejected
+# 18
+model <- lm(data = df, price ~ carat + depth + cut)
+resettest(model)  # H0: there are missing variables
+# 19
+qplot(data = df, log(price), fill=cut, geom = "density", alpha = 0.5) + facet_grid(~cut)
+qplot(data = df, log(price), fill=color, geom = "density", alpha = 0.5) + facet_wrap(~color)
+# 20
+qplot(data=df, log(carat), log(price), color = clarity) + facet_wrap(~cut)
+```
+
+

@@ -1,0 +1,103 @@
+---
+title: 'Exam #2'
+author:
+  name: Dmitriy Tsimokha
+date: "13.12.20"
+output:
+  html_document:
+    df_print: paged
+  rmdformats::downcute:
+    code_folding: show
+    self_contained: yes
+    thumbnails: no
+    lightbox: yes
+fontsize: 14pt
+---
+
+```{r data_loading, message=FALSE, warning=FALSE}
+library(sjPlot) # Для графиков и таблиц
+library(sjstats) # для omega_sq и eta_sq
+library (FSA) # Dunn test
+library(effsize) # cohen's D
+library(rstatix) # wilcox_effsize 
+library(magrittr) # для pipes, которые необходимы в wilcox_effsize
+library(car)  # для перекодировок
+library(dplyr) # для перикодировок, создания подвыборки
+library(stargazer)
+library(jtools)
+df <- read.csv("exam2.csv")
+df <- df[df$cntry=="Netherlands", ]
+```
+
+
+# Task 1
+
+```{r}
+model0 <- lm(data = df, Universalism ~ gndr + agea1)
+model1 <- lm(data = df, Universalism ~ brncntr + gndr + agea1)
+tab_model(model0, model1, title = "Models comparison", dv.labels = c("Only control", "Predictor & Control"))
+```
+
+Both models have only significant effects (but weak ones).
+
+## Comparison
+
+```{r results="asis", message=FALSE, warning=FALSE}
+stargazer(anova(model0, model1), type = "html", title="ANoVA", intercept.bottom = FALSE,
+          single.row = TRUE, align=TRUE, ci=TRUE, ci.level=0.95, no.space=TRUE)
+```
+
+Model with key predictor is better.
+
+## Summary
+
+```{r}
+tab_model(model1, title = "Main model", dv.labels = c("Predictor & Control"))
+```
+
+Model has only weak effect and explains only 2% of variance.
+
+## Viz
+
+```{r message=FALSE, warning=FALSE}
+plot_summs(model1, plot.distributions = TRUE, inner_ci_level = .9)
+```
+
+# Task 2
+
+```{r message=FALSE, warning=FALSE}
+library(PerformanceAnalytics)
+chart.Correlation(df[,c("eduyrs1", "agemage1", "ageoage1")], histogram=TRUE, pch=19)
+```
+
+The most big correlation is between **agemage1** and **ageoage1** - it can be interpreted as paired perception of both aged groups for respondents. If respondent perceive one age group to start with bigger than median age he or she will perceive other age group to start with bigger age too.
+
+# Task 3
+
+```{r}
+df$marital1 <- as.factor(df$marital1)
+
+(res.aov <- df %>% anova_test(agemage1 ~ marital1))
+```
+
+Significant!
+
+```{r}
+(pwc <- df %>% pairwise_t_test(agemage1 ~ marital1, p.adjust.method = "bonferroni"))
+```
+
+
+
+```{r}
+library(ggpubr)
+pwc <- pwc %>% add_xy_position(x = "marital1")
+ggboxplot(df, x = "marital1", y = "agemage1") +
+  stat_pvalue_manual(pwc, label = "p.adj.signif", hide.ns = TRUE, tip.length = 0, step.increase = 0.1) +
+  labs(
+    subtitle = get_test_label(res.aov, detailed = TRUE),
+    caption = get_pwc_label(pwc)
+    )
+```
+
+There is no really interesting either strong difference between groups - they are all looks nearly the same.
+
